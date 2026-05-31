@@ -10,7 +10,7 @@ Flujo principal cuando el usuario envia un mensaje:
 Usuario en frontend
   -> frontend/app.js envia POST /chat
   -> backend/main.py recibe la solicitud
-  -> backend/agent.py ejecuta run_agent()
+  -> backend/agent.py importa run_agent() desde agent_core.py
   -> LangGraph decide si usa tools
   -> tools consultan web, moneda, RAG o imagenes
   -> el agente genera respuesta
@@ -22,7 +22,7 @@ Donde verlo:
 
 - Frontend envia `/chat`: `frontend/app.js`, lineas 586-643.
 - Endpoint `/chat`: `backend/main.py`, lineas 90-110.
-- Ejecucion del agente: `backend/agent.py`, lineas 675-844.
+- Ejecucion del agente: `backend/agent_core.py`, funcion `run_agent()`.
 - Render de respuesta, mapa e imagenes: `frontend/app.js`, lineas 453-538.
 
 ## 2. Backend FastAPI: main.py
@@ -72,28 +72,28 @@ Devuelve:
 
 ## 3. Agentes usados
 
-Los agentes estan en `backend/agent.py`.
+Los agentes estan en `backend/agent_core.py`.
 
-Modelos configurados:
+Modelos configurados (definidos en `backend/config.py`):
 
-- `GROQ_FAST_MODEL`: `llama-3.1-8b-instant`, lineas 31 y 524.
-- `GROQ_THINKING_MODEL`: `llama-3.3-70b-versatile`, lineas 32 y 525.
+- `GROQ_FAST_MODEL`: `llama-3.1-8b-instant`.
+- `GROQ_THINKING_MODEL`: `llama-3.3-70b-versatile`.
 
 Se crean dos agentes con LangGraph:
 
-- `_agent`: agente rapido, lineas 542-547.
-- `_thinking_agent`: agente pensador, lineas 548-553.
+- `_agent`: agente rapido.
+- `_thinking_agent`: agente pensador.
 
 Ambos comparten:
 
-- Las mismas tools: linea 523.
-- La misma memoria: linea 526.
-- El mismo prompt dinamico: lineas 535-538.
-- El mismo RAG/FAISS a traves de la tool `travel_knowledge`.
+- Las mismas tools (definidas en `backend/tools.py`).
+- La misma memoria (MemorySaver).
+- El mismo prompt dinamico (definido en `backend/config.py`).
+- El mismo RAG/FAISS a traves de la tool `travel_knowledge` (definido en `backend/rag.py`).
 
 ### Router de agente
 
-Ubicacion: `backend/agent.py`, lineas 556-585.
+Ubicacion: `backend/agent_core.py`, funcion `_select_agent`.
 
 Funcion:
 
@@ -114,7 +114,7 @@ Como explicarlo:
 
 ## 4. System prompt
 
-Ubicacion: `backend/agent.py`, lineas 490-517.
+Ubicacion: `backend/config.py`, constante `SYSTEM_PROMPT`.
 
 El prompt esta dividido en bloques:
 
@@ -128,21 +128,18 @@ El prompt esta dividido en bloques:
 
 Tambien se reduce el historial enviado al modelo:
 
-- `_trim_to_window`: lineas 529-532.
-- `_agent_prompt`: lineas 535-538.
+- `_trim_to_window`: funcion en `backend/agent_core.py`.
+- `_agent_prompt`: funcion en `backend/agent_core.py`.
 
 Actualmente se mandan maximo 8 mensajes no-system al modelo.
 
 ## 5. Tools implementadas
 
-Las tools son funciones decoradas con `@tool` de LangChain. Estan en `backend/agent.py` y se conectan al agente en la lista `_tools`, linea 523.
+Las tools son funciones decoradas con `@tool` de LangChain. Estan en `backend/tools.py` y se conectan al agente en la lista `_tools` en `backend/agent_core.py`.
 
 ### 5.1 web_search
 
-Ubicacion:
-
-- Wrapper DuckDuckGo: lineas 150-153.
-- Tool `web_search`: lineas 192-211.
+Ubicacion: `backend/tools.py`, funcion `web_search`.
 
 Que hace:
 
@@ -167,10 +164,7 @@ Limitacion:
 
 ### 5.2 currency_converter
 
-Ubicacion:
-
-- Cache de tasas: lineas 217-221.
-- Tool `currency_converter`: lineas 224-257.
+Ubicacion: `backend/tools.py`, funcion `currency_converter`.
 
 Que hace:
 
@@ -192,10 +186,7 @@ Limitacion:
 
 ### 5.3 travel_knowledge
 
-Ubicacion:
-
-- Tool `travel_knowledge`: lineas 263-280.
-- Cache RAG: lineas 283-288.
+Ubicacion: `backend/tools.py`, funcion `travel_knowledge`.
 
 Que hace:
 
@@ -214,14 +205,15 @@ Limitacion:
 
 ### 5.4 place_image_search
 
-Ubicacion:
+Ubicacion: `backend/tools.py`, funcion `place_image_search`.
 
-- Variantes/alias de busqueda: lineas 83-117.
-- DuckDuckGo images: lineas 156-159.
-- Busqueda principal de imagenes: lineas 291-330.
-- Fallback Wikimedia: lineas 333-425.
-- Filtro de imagenes no turisticas: lineas 454-468.
-- Tool `place_image_search`: lineas 471-484.
+Funciones de apoyo en `backend/image_utils.py`:
+
+- Variantes/alias de busqueda: `_get_image_search_variants`.
+- DuckDuckGo images: `_ddg_image_search` (en `backend/utils.py`).
+- Busqueda principal de imagenes: `_cached_destination_images`.
+- Fallback Wikimedia: `_wikimedia_destination_images`.
+- Filtro de imagenes no turisticas: `_is_non_travel_image_url`.
 
 Que hace:
 
@@ -249,7 +241,7 @@ RAG significa Retrieval Augmented Generation. En vez de depender solo del modelo
 
 ### Donde se inicializa
 
-Ubicacion: `backend/agent.py`, lineas 162-186.
+Ubicacion: `backend/rag.py`, funcion `setup_rag()`.
 
 `setup_rag()` se llama al iniciar FastAPI:
 
@@ -257,7 +249,7 @@ Ubicacion: `backend/agent.py`, lineas 162-186.
 
 ### Fuente del RAG
 
-Ubicacion: `backend/agent.py`, linea 30.
+Ubicacion: `backend/config.py`, constante `RAG_URL`.
 
 ```python
 RAG_URL = "https://en.wikipedia.org/wiki/Tourism_in_Colombia"
@@ -273,7 +265,7 @@ Se limpia con BeautifulSoup:
 
 ### Chunks
 
-Ubicacion: `backend/agent.py`, lineas 177-178.
+Ubicacion: `backend/rag.py`, funcion `setup_rag()`.
 
 Configuracion:
 
@@ -294,7 +286,7 @@ Cuantos chunks se usan:
 
 ### Embeddings
 
-Ubicacion: `backend/agent.py`, linea 180.
+Ubicacion: `backend/rag.py`, funcion `setup_rag()`.
 
 ```python
 GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
@@ -309,10 +301,7 @@ Funcionamiento:
 
 ### FAISS
 
-Ubicacion:
-
-- Creacion de vectorstore: linea 181.
-- Retriever: linea 182.
+Ubicacion: `backend/rag.py`, funcion `setup_rag()`.
 
 ```python
 vectorstore = FAISS.from_documents(chunks, embeddings)
@@ -334,7 +323,7 @@ Como explicarlo:
 
 ### Retry
 
-Ubicacion: `backend/agent.py`, lineas 139-147.
+Ubicacion: `backend/utils.py`, funcion `_retry`.
 
 `_retry` reintenta operaciones que pueden fallar por red o servicio externo:
 
@@ -348,11 +337,11 @@ Ubicacion: `backend/agent.py`, lineas 139-147.
 
 Cache implementada con `@lru_cache`:
 
-- Monedas: lineas 217-221.
-- RAG: lineas 283-288.
-- Imagenes: lineas 291-330.
-- Wikimedia: lineas 333-425.
-- Summaries: lineas 428-451.
+- Monedas: `backend/tools.py`, funcion `_currency_rates`.
+- RAG: `backend/tools.py`, funcion `_cached_travel_knowledge`.
+- Imagenes: `backend/image_utils.py`, funcion `_cached_destination_images`.
+- Wikimedia: `backend/image_utils.py`, funcion `_wikimedia_destination_images`.
+- Summaries: `backend/image_utils.py`, funcion `fetch_destination_summary`.
 
 Limitacion:
 
@@ -492,11 +481,11 @@ Tambien agrega links:
 
 Se usa para:
 
-- Definir tools con `@tool`: `backend/agent.py`, lineas 17, 192, 224, 263 y 471.
-- Manejar mensajes: `HumanMessage`, `AIMessage`, `SystemMessage`, lineas 18 y 711.
-- Conectar Groq con `ChatGroq`: lineas 16, 524 y 525.
-- Crear embeddings con Gemini: lineas 15 y 180.
-- Usar FAISS desde LangChain Community: linea 166.
+- Definir tools con `@tool`: `backend/tools.py`.
+- Manejar mensajes: `HumanMessage`, `AIMessage`, `SystemMessage` en `backend/agent_core.py`.
+- Conectar Groq con `ChatGroq`: `backend/agent_core.py`.
+- Crear embeddings con Gemini: `backend/rag.py`.
+- Usar FAISS desde LangChain Community: `backend/rag.py`.
 
 Como explicarlo:
 
@@ -506,9 +495,9 @@ Como explicarlo:
 
 Se usa para crear el agente ReAct:
 
-- Importacion: `backend/agent.py`, linea 21.
-- Creacion de agentes: lineas 542-553.
-- Memoria: lineas 23-25 y 526.
+- Importacion: `backend/agent_core.py`.
+- Creacion de agentes: `backend/agent_core.py`.
+- Memoria: `backend/agent_core.py`.
 
 Patron ReAct:
 
@@ -528,9 +517,9 @@ Como explicarlo:
 
 Ubicacion:
 
-- MemorySaver import: `backend/agent.py`, lineas 22-25.
-- Instancia `_memory`: linea 526.
-- Config por sesion: linea 692.
+- MemorySaver import: `backend/agent_core.py`.
+- Instancia `_memory`: `backend/agent_core.py`.
+- Config por sesion: `backend/agent_core.py`, funcion `run_agent`.
 
 El frontend genera `sessionId`:
 
