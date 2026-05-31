@@ -97,15 +97,25 @@ ViajeBot is configured as an **Expert Travel Advisor**. It uses the following to
 ```
 Prueba-IA-Advanced/
 ├── backend/
-│   ├── main.py         # FastAPI Endpoints (/chat, /tts, /transcribe)
-│   ├── agent.py        # LangGraph AI Agent & Tools
-│   └── .env            # API keys (Protected)
+│   ├── main.py             # FastAPI Endpoints (/chat, /tts, /transcribe)
+│   ├── agent/              # LangGraph AI Agent (split into sections)
+│   │   ├── __init__.py     # Public API (run_agent, setup_rag, search_destination_images)
+│   │   ├── config.py       # Env vars, models & system prompt
+│   │   ├── vocabulary.py   # Keyword sets, destinations & aliases
+│   │   ├── helpers.py      # Generic helpers (retry, text matching, cleaning)
+│   │   ├── language.py     # Language detection, travel guardrail & destination extraction
+│   │   ├── rag.py          # RAG knowledge base (Colombia tourism, FAISS)
+│   │   ├── media.py        # Image search (DuckDuckGo + Wikimedia) & summaries
+│   │   ├── tools.py        # The 4 LangChain tools
+│   │   ├── core.py         # LLMs, memory, agent build & model router
+│   │   └── runner.py       # run_agent(): orchestration & post-processing
+│   └── .env                # API keys (Protected)
 ├── frontend/
-│   ├── index.html      # Glassmorphism UI
-│   ├── styles.css      # Premium Dark Mode
-│   └── app.js          # Chat & Audio Logic
-├── requirements.txt    # Python dependencies
-└── README.md           # This guide
+│   ├── index.html          # Glassmorphism UI
+│   ├── styles.css          # Premium Dark Mode
+│   └── app.js              # Chat & Audio Logic
+├── requirements.txt        # Python dependencies
+└── README.md               # This guide
 ```
 
 ---

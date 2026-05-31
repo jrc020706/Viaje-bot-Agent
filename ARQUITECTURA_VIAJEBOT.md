@@ -2,6 +2,20 @@
 
 Este documento explica como se conectan las partes principales de ViajeBot: frontend, backend FastAPI, agentes LangGraph, tools, RAG con FAISS, busqueda de imagenes, audio/TTS, memoria, cache y costos aproximados por tokens.
 
+> Nota: el agente antes vivia en un unico archivo `backend/agent.py`. Ahora esta dividido en el paquete `backend/agent/` por secciones, para que sea mas facil de leer y explicar. La API publica (`run_agent`, `setup_rag`, `search_destination_images`) se re-exporta en `backend/agent/__init__.py`, por lo que `main.py` sigue importando con `from agent import ...`.
+
+### Estructura del paquete `backend/agent/`
+
+- `config.py`: variables de entorno, modelos de Groq y system prompt.
+- `vocabulary.py`: palabras clave, destinos conocidos y alias.
+- `helpers.py`: helpers genericos (`_retry`, `_contains_any`, limpieza de destino).
+- `language.py`: deteccion de idioma, guardrail de viajes y extraccion de destino.
+- `rag.py`: RAG con FAISS de turismo de Colombia.
+- `media.py`: busqueda de imagenes (DuckDuckGo + Wikimedia) y resumenes.
+- `tools.py`: las 4 tools LangChain del agente.
+- `core.py`: modelos, memoria, construccion del agente y router `_select_agent`.
+- `runner.py`: `run_agent()`, orquestacion y post-procesamiento de la respuesta.
+
 ## 1. Vision general del flujo
 
 Flujo principal cuando el usuario envia un mensaje:
@@ -10,7 +24,7 @@ Flujo principal cuando el usuario envia un mensaje:
 Usuario en frontend
   -> frontend/app.js envia POST /chat
   -> backend/main.py recibe la solicitud
-  -> backend/agent.py ejecuta run_agent()
+  -> backend/agent/runner.py ejecuta run_agent()
   -> LangGraph decide si usa tools
   -> tools consultan web, moneda, RAG o imagenes
   -> el agente genera respuesta
@@ -22,7 +36,7 @@ Donde verlo:
 
 - Frontend envia `/chat`: `frontend/app.js`, lineas 586-643.
 - Endpoint `/chat`: `backend/main.py`, lineas 90-110.
-- Ejecucion del agente: `backend/agent.py`, lineas 675-844.
+- Ejecucion del agente: `backend/agent/runner.py`, lineas 25-194.
 - Render de respuesta, mapa e imagenes: `frontend/app.js`, lineas 453-538.
 
 ## 2. Backend FastAPI: main.py
@@ -72,28 +86,28 @@ Devuelve:
 
 ## 3. Agentes usados
 
-Los agentes estan en `backend/agent.py`.
+Los agentes se construyen en `backend/agent/core.py`.
 
 Modelos configurados:
 
-- `GROQ_FAST_MODEL`: `llama-3.1-8b-instant`, lineas 31 y 524.
-- `GROQ_THINKING_MODEL`: `llama-3.3-70b-versatile`, lineas 32 y 525.
+- `GROQ_FAST_MODEL`: `llama-3.1-8b-instant`, `config.py` linea 23 y `core.py` linea 30.
+- `GROQ_THINKING_MODEL`: `llama-3.3-70b-versatile`, `config.py` linea 24 y `core.py` linea 31.
 
 Se crean dos agentes con LangGraph:
 
-- `_agent`: agente rapido, lineas 542-547.
-- `_thinking_agent`: agente pensador, lineas 548-553.
+- `_agent`: agente rapido, `core.py` lineas 48-53.
+- `_thinking_agent`: agente pensador, `core.py` lineas 54-59.
 
 Ambos comparten:
 
-- Las mismas tools: linea 523.
-- La misma memoria: linea 526.
-- El mismo prompt dinamico: lineas 535-538.
+- Las mismas tools: `core.py` linea 29.
+- La misma memoria: `core.py` linea 32.
+- El mismo prompt dinamico: `core.py` lineas 41-44.
 - El mismo RAG/FAISS a traves de la tool `travel_knowledge`.
 
 ### Router de agente
 
-Ubicacion: `backend/agent.py`, lineas 556-585.
+Ubicacion: `backend/agent/core.py`, lineas 62-91.
 
 Funcion:
 
@@ -114,7 +128,7 @@ Como explicarlo:
 
 ## 4. System prompt
 
-Ubicacion: `backend/agent.py`, lineas 490-517.
+Ubicacion: `backend/agent/config.py`, lineas 34-61.
 
 El prompt esta dividido en bloques:
 
@@ -128,21 +142,21 @@ El prompt esta dividido en bloques:
 
 Tambien se reduce el historial enviado al modelo:
 
-- `_trim_to_window`: lineas 529-532.
-- `_agent_prompt`: lineas 535-538.
+- `_trim_to_window`: `core.py` lineas 35-38.
+- `_agent_prompt`: `core.py` lineas 41-44.
 
 Actualmente se mandan maximo 8 mensajes no-system al modelo.
 
 ## 5. Tools implementadas
 
-Las tools son funciones decoradas con `@tool` de LangChain. Estan en `backend/agent.py` y se conectan al agente en la lista `_tools`, linea 523.
+Las tools son funciones decoradas con `@tool` de LangChain. Estan en `backend/agent/tools.py` y se conectan al agente en la lista `_tools` de `core.py`, linea 29.
 
 ### 5.1 web_search
 
 Ubicacion:
 
-- Wrapper DuckDuckGo: lineas 150-153.
-- Tool `web_search`: lineas 192-211.
+- Wrapper DuckDuckGo: `tools.py`, lineas 27-30.
+- Tool `web_search`: `tools.py`, lineas 34-55.
 
 Que hace:
 
@@ -169,8 +183,8 @@ Limitacion:
 
 Ubicacion:
 
-- Cache de tasas: lineas 217-221.
-- Tool `currency_converter`: lineas 224-257.
+- Cache de tasas: `tools.py`, lineas 58-62.
+- Tool `currency_converter`: `tools.py`, lineas 66-101.
 
 Que hace:
 
@@ -194,8 +208,9 @@ Limitacion:
 
 Ubicacion:
 
-- Tool `travel_knowledge`: lineas 263-280.
-- Cache RAG: lineas 283-288.
+- Tool `travel_knowledge` (envoltorio @tool): `tools.py`, lineas 105-114.
+- Logica del RAG (`travel_knowledge_lookup`): `rag.py`, lineas 53-65.
+- Cache RAG: `rag.py`, lineas 68-73.
 
 Que hace:
 
@@ -216,12 +231,13 @@ Limitacion:
 
 Ubicacion:
 
-- Variantes/alias de busqueda: lineas 83-117.
-- DuckDuckGo images: lineas 156-159.
-- Busqueda principal de imagenes: lineas 291-330.
-- Fallback Wikimedia: lineas 333-425.
-- Filtro de imagenes no turisticas: lineas 454-468.
-- Tool `place_image_search`: lineas 471-484.
+- Alias de busqueda: `vocabulary.py`, lineas 57-74.
+- Variantes de busqueda (`_get_image_search_variants`): `helpers.py`, lineas 51-65.
+- DuckDuckGo images: `media.py`, lineas 22-25.
+- Busqueda principal de imagenes: `media.py`, lineas 29-67.
+- Fallback Wikimedia: `media.py`, lineas 71-162.
+- Filtro de imagenes no turisticas: `media.py`, lineas 191-205.
+- Tool `place_image_search`: `tools.py`, lineas 121-133.
 
 Que hace:
 
@@ -249,7 +265,7 @@ RAG significa Retrieval Augmented Generation. En vez de depender solo del modelo
 
 ### Donde se inicializa
 
-Ubicacion: `backend/agent.py`, lineas 162-186.
+Ubicacion: `backend/agent/rag.py`, lineas 26-50.
 
 `setup_rag()` se llama al iniciar FastAPI:
 
@@ -257,7 +273,7 @@ Ubicacion: `backend/agent.py`, lineas 162-186.
 
 ### Fuente del RAG
 
-Ubicacion: `backend/agent.py`, linea 30.
+Ubicacion: `backend/agent/config.py`, linea 20.
 
 ```python
 RAG_URL = "https://en.wikipedia.org/wiki/Tourism_in_Colombia"
@@ -265,15 +281,15 @@ RAG_URL = "https://en.wikipedia.org/wiki/Tourism_in_Colombia"
 
 Se descarga el HTML:
 
-- Linea 171.
+- `rag.py`, linea 35.
 
 Se limpia con BeautifulSoup:
 
-- Lineas 172-175.
+- `rag.py`, lineas 36-39.
 
 ### Chunks
 
-Ubicacion: `backend/agent.py`, lineas 177-178.
+Ubicacion: `backend/agent/rag.py`, lineas 41-42.
 
 Configuracion:
 
@@ -289,12 +305,12 @@ Que significa:
 
 Cuantos chunks se usan:
 
-- Chunks totales indexados: dependen del tamano del texto descargado. El sistema lo imprime al arrancar en la linea 183.
-- Chunks recuperados por pregunta: `k=2`, linea 182.
+- Chunks totales indexados: dependen del tamano del texto descargado. El sistema lo imprime al arrancar en `rag.py`, linea 47.
+- Chunks recuperados por pregunta: `k=2`, `rag.py` linea 46.
 
 ### Embeddings
 
-Ubicacion: `backend/agent.py`, linea 180.
+Ubicacion: `backend/agent/rag.py`, linea 44.
 
 ```python
 GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
@@ -311,8 +327,8 @@ Funcionamiento:
 
 Ubicacion:
 
-- Creacion de vectorstore: linea 181.
-- Retriever: linea 182.
+- Creacion de vectorstore: `rag.py`, linea 45.
+- Retriever: `rag.py`, linea 46.
 
 ```python
 vectorstore = FAISS.from_documents(chunks, embeddings)
@@ -334,7 +350,7 @@ Como explicarlo:
 
 ### Retry
 
-Ubicacion: `backend/agent.py`, lineas 139-147.
+Ubicacion: `backend/agent/helpers.py`, lineas 16-24.
 
 `_retry` reintenta operaciones que pueden fallar por red o servicio externo:
 
@@ -348,11 +364,11 @@ Ubicacion: `backend/agent.py`, lineas 139-147.
 
 Cache implementada con `@lru_cache`:
 
-- Monedas: lineas 217-221.
-- RAG: lineas 283-288.
-- Imagenes: lineas 291-330.
-- Wikimedia: lineas 333-425.
-- Summaries: lineas 428-451.
+- Monedas: `tools.py`, lineas 58-62.
+- RAG: `rag.py`, lineas 68-73.
+- Imagenes: `media.py`, lineas 29-67.
+- Wikimedia: `media.py`, lineas 71-162.
+- Summaries: `media.py`, lineas 165-188.
 
 Limitacion:
 
@@ -492,11 +508,11 @@ Tambien agrega links:
 
 Se usa para:
 
-- Definir tools con `@tool`: `backend/agent.py`, lineas 17, 192, 224, 263 y 471.
-- Manejar mensajes: `HumanMessage`, `AIMessage`, `SystemMessage`, lineas 18 y 711.
-- Conectar Groq con `ChatGroq`: lineas 16, 524 y 525.
-- Crear embeddings con Gemini: lineas 15 y 180.
-- Usar FAISS desde LangChain Community: linea 166.
+- Definir tools con `@tool`: `backend/agent/tools.py`, lineas 17, 33, 65, 104 y 120.
+- Manejar mensajes: `HumanMessage`/`AIMessage` en `runner.py` linea 11; `SystemMessage` en `core.py` linea 11.
+- Conectar Groq con `ChatGroq`: `core.py`, lineas 12, 30 y 31.
+- Crear embeddings con Gemini: `rag.py`, lineas 16 y 44.
+- Usar FAISS desde LangChain Community: `rag.py`, linea 30.
 
 Como explicarlo:
 
@@ -506,9 +522,9 @@ Como explicarlo:
 
 Se usa para crear el agente ReAct:
 
-- Importacion: `backend/agent.py`, linea 21.
-- Creacion de agentes: lineas 542-553.
-- Memoria: lineas 23-25 y 526.
+- Importacion: `backend/agent/core.py`, linea 15.
+- Creacion de agentes: `core.py`, lineas 48-59.
+- Memoria: `core.py`, lineas 16-19 y 32.
 
 Patron ReAct:
 
@@ -528,9 +544,9 @@ Como explicarlo:
 
 Ubicacion:
 
-- MemorySaver import: `backend/agent.py`, lineas 22-25.
-- Instancia `_memory`: linea 526.
-- Config por sesion: linea 692.
+- MemorySaver import: `backend/agent/core.py`, lineas 16-19.
+- Instancia `_memory`: `core.py`, linea 32.
+- Config por sesion: `runner.py`, linea 42.
 
 El frontend genera `sessionId`:
 
@@ -578,7 +594,7 @@ Estimacion practica por pregunta en ViajeBot:
   - Output: 200 a 700 tokens.
 - Pregunta con RAG:
   - Input adicional por RAG: hasta 2 chunks recuperados.
-  - Cada chunk se recorta a 450 caracteres en la linea 288.
+  - Cada chunk se recorta a 450 caracteres en `rag.py`, linea 73.
   - En total suele sumar alrededor de 200 a 300 tokens extra.
 
 Ejemplo aproximado con 2,000 tokens de entrada y 400 de salida:
