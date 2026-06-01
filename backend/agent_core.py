@@ -172,13 +172,30 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
     messages: list = result.get("messages", [])
 
     # ── Extract latest AI response ────────────────────────────────────────────
-    ai_messages = [m for m in messages if isinstance(m, AIMessage)]
-    output_text = ai_messages[-1].content if ai_messages else "Sorry, I didn't get a response."
-    if isinstance(output_text, list):  # handle multi-part content
-        output_text = " ".join(
-            p.get("text", "") if isinstance(p, dict) else str(p)
-            for p in output_text
-        )
+    # Look for the last AI message that actually has content.
+    output_text = ""
+    for m in reversed(messages):
+        if isinstance(m, AIMessage) and m.content:
+            if isinstance(m.content, list):
+                output_text = " ".join(
+                    p.get("text", "") if isinstance(p, dict) else str(p)
+                    for p in m.content
+                )
+            else:
+                output_text = str(m.content)
+            if output_text.strip():
+                break
+
+    # If the AI response is empty but tools were used, check if we should show tool results.
+    # This is a fallback in case the model only generates tool calls without final content.
+    if not output_text.strip():
+        for m in reversed(messages):
+            if hasattr(m, "content") and m.content and not isinstance(m, HumanMessage):
+                output_text = str(m.content)
+                break
+    
+    if not output_text:
+        output_text = "Sorry, I didn't get a response."
 
     normalized_output = output_text.lower()
     # user_lang_es already detected at the beginning of run_agent
