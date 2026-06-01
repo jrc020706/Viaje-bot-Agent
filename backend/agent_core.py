@@ -150,18 +150,20 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
     agent_message = user_message
     destination_for_location = _extract_destination_from_location_question(user_message)
     
-    # Add language hint to the agent
-    language_hint = "[RESPOND IN SPANISH]" if user_lang_es else "[RESPOND IN ENGLISH]"
-    
+    # Add language hint and context to the agent
+    if user_lang_es:
+        language_hint = "[RESPONDE EN ESPAÑOL]"
+        location_instruction = "Pregunta sobre la ubicación del destino. Responde brevemente indicando dónde queda y menciona el mapa/galería de abajo."
+    else:
+        language_hint = "[RESPOND IN ENGLISH]"
+        location_instruction = "Travel destination location question. Answer briefly with where this place is located and mention the map/gallery below."
+
     mode_hint = ""
     if mode in {"voice", "audio"}:
-        mode_hint = " [VOICE MODE: answer in 2-4 short sentences.]"
+        mode_hint = " [MODO VOZ: responde en 2-4 frases cortas.]" if user_lang_es else " [VOICE MODE: answer in 2-4 short sentences.]"
 
     if destination_for_location:
-        agent_message = (
-            f"{language_hint}{mode_hint} Travel destination location question. Answer briefly with where this "
-            f"place is located and mention the map/gallery below: {user_message}"
-        )
+        agent_message = f"{language_hint}{mode_hint} {location_instruction}: {user_message}"
     else:
         agent_message = f"{language_hint}{mode_hint} {user_message}"
 
@@ -192,17 +194,26 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
         if isinstance(m, ToolMessage):
             tool_results.append(str(m.content))
     
-    # If tools were used and the output is missing figures or too short, 
-    # append/prepend the tool results.
+    # If tools were used, ensure the results are present in the output.
     if tool_results:
         combined_tool_text = "\n\n".join(tool_results)
-        # Check if the output text is very short or looks like a disclaimer
-        is_generic = "fluctuate" in output_text.lower() or "accurate at the time" in output_text.lower()
-        if len(output_text.strip()) < 50 or is_generic:
-            if output_text.strip():
-                output_text = f"{output_text}\n\n{combined_tool_text}"
-            else:
-                output_text = combined_tool_text
+        
+        # Heuristic: If it's a currency or image request, we WANT the raw tool data visible
+        # unless it's already clearly present in the AI response.
+        conversion_terms = ("convertir", "cambio", "tasa", "convert", "rate", "currency", "dolar", "peso", "usd", "cop")
+        is_conversion = _contains_any(user_message.lower(), conversion_terms)
+        
+        # If the output text is short, or it doesn't seem to contain the figures from the tool,
+        # or it's a special request type, append the tool results.
+        content_missing = not any(char.isdigit() for char in output_text) if is_conversion else False
+        
+        if len(output_text.strip()) < 120 or is_conversion or content_missing:
+            # Avoid obvious duplicates
+            if combined_tool_text[:30] not in output_text:
+                if output_text.strip():
+                    output_text = f"{output_text}\n\n{combined_tool_text}"
+                else:
+                    output_text = combined_tool_text
     
     if not output_text:
         output_text = "Sorry, I didn't get a response."
