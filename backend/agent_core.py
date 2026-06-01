@@ -1,5 +1,5 @@
 """
-Core del agente LangGraph: System prompt, agentes y routing
+LangGraph Agent Core: System prompt, agents, and routing
 """
 
 import os
@@ -18,7 +18,7 @@ from config import (
     GROQ_THINKING_MODEL,
     GROQ_API_KEY,
     SYSTEM_PROMPT,
-    TRAVEL_SCOPE_MESSAGE_ES,
+    TRAVEL_SCOPE_MESSAGE,
     IMAGE_REQUEST_TERMS,
     MAP_REQUEST_TERMS,
     GENERIC_SCOPE_REFUSALS,
@@ -29,7 +29,7 @@ from image_utils import fetch_destination_summary
 
 
 # ---------------------------------------------------------------------------
-# Agentes LangGraph
+# LangGraph Agents
 # ---------------------------------------------------------------------------
 _tools = [web_search, currency_converter, travel_knowledge, place_image_search]
 _llm = ChatGroq(model=GROQ_FAST_MODEL, groq_api_key=GROQ_API_KEY, temperature=0.1)
@@ -38,18 +38,18 @@ _memory = MemorySaver()
 
 
 def _trim_to_window(messages: list, window: int = 8) -> list:
-    """Mantiene solo los últimos `window` mensajes no-system para el contexto del modelo."""
+    """Keeps only the last `window` non-system messages for model context."""
     other_msgs = [m for m in messages if not isinstance(m, SystemMessage)]
     return other_msgs[-window:] if len(other_msgs) > window else other_msgs
 
 
 def _agent_prompt(state: dict) -> list:
-    """Reduce el contexto del modelo manteniendo los últimos turnos de conversación."""
+    """Reduces model context by keeping only the latest interaction turns."""
     messages = state.get("messages", [])
     return [SystemMessage(content=SYSTEM_PROMPT)] + _trim_to_window(messages, window=8)
 
 
-# Construir ambos agentes. Comparten tools, FAISS-backed RAG y memoria de sesión.
+# Build both agents. They share tools, FAISS-backed RAG, and session memory.
 _agent = create_react_agent(
     _llm,
     _tools,
@@ -65,12 +65,12 @@ _thinking_agent = create_react_agent(
 
 
 # ---------------------------------------------------------------------------
-# Router de agente
+# Agent Router
 # ---------------------------------------------------------------------------
 def _select_agent(user_message: str, mode: str = "text"):
     """
-    Enruta turnos simples/de voz al modelo rápido y turnos complejos de texto
-    al modelo de razonamiento más fuerte. Las funciones de tools y FAISS se comparten.
+    Routes simple/voice turns to the fast model and complex text turns
+    to the stronger reasoning model. Tool functions and FAISS are shared.
     """
     normalized = user_message.lower()
     normalized = re.sub(r"\s+", " ", normalized)
@@ -82,6 +82,7 @@ def _select_agent(user_message: str, mode: str = "text"):
         "imagen", "imagenes", "imágenes", "foto", "fotos", "mapa", "maps",
         "google maps", "donde queda", "dónde queda", "donde esta", "dónde está",
         "convierte", "convertir", "currency", "cambio", "tasa",
+        "image", "images", "photo", "photos", "map", "convert", "rate",
     )
     if _contains_any(normalized, fast_only_terms):
         return _agent, GROQ_FAST_MODEL
@@ -91,6 +92,7 @@ def _select_agent(user_message: str, mode: str = "text"):
         "safety", "riesgo", "visa", "comparar", "compare", "recomienda",
         "recommend", "familia", "family", "dias", "días", "weeks", "semanas",
         "barato", "lujo", "hotel", "hoteles",
+        "itinerary", "route", "risk", "cheap", "luxury", "hotels",
     )
     is_long = len(normalized.split()) >= 18
     if is_long or _contains_any(normalized, thinking_terms):
@@ -100,16 +102,16 @@ def _select_agent(user_message: str, mode: str = "text"):
 
 
 # ---------------------------------------------------------------------------
-# Función principal del agente
+# Main Agent Execution Function
 # ---------------------------------------------------------------------------
 def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
     """
-    Ejecuta el agente para una sesión dada.
-    Retorna: { text, tool_used, tool_name, tools_used, destination, model_used }
+    Executes the agent for a given session.
+    Returns: { text, tool_used, tool_name, tools_used, destination, model_used }
     """
-    # Detectar idioma del usuario temprano
+    # Detect user language early
     user_language = _detect_language(user_message)
-    user_is_spanish = (user_language == 'es')
+    user_lang_es = (user_language == 'es')
     
     if not _contains_any(user_message, (
         "travel", "trip", "tourism", "tourist", "destination", "destinations", "city",
@@ -128,7 +130,7 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
         "costo", "costos", "tarifa", "tarifas", "boleto", "boletos", "tiquete", "tiquetes",
         "pasaje", "pasajes", "cuanto cuesta", "cuánto cuesta",
         "clima", "ruta", "mapa", "mapas", "ubicacion", "ubicado", "queda", "playa",
-        "museo", "restaurante", "comida", "seguridad", "transporte", "aeropuerto",
+        "museum", "restaurante", "comida", "seguridad", "transporte", "aeropuerto",
         "tren", "bus", "empacar", "temporada", "vacaciones", "imagenes", "fotos",
         "lugares", "ciudades", "actividades", "hacer", "alla", "allá", "alli", "allí", "google maps", "donde esta", "donde queda", "donde se ubica", "llegar", "arrive", "how to", "como llegar", "cómo llegar", "como viajo", "cómo viajo",
         "peligroso", "peligroso", "seguro", "peligro", "peligros", "delito", "violencia", "advertencia", "consejo", "recomendacion", "evitar", "riesgo",
@@ -136,7 +138,7 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
         "europa", "sudamerica", "suramerica", "centroamerica", "norteamerica", "oceania", "medio oriente",
     )):
         return {
-            "text": TRAVEL_SCOPE_MESSAGE_ES,
+            "text": TRAVEL_SCOPE_MESSAGE,
             "tool_used": False,
             "tools_used": [],
             "tool_name": None,
@@ -148,8 +150,8 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
     agent_message = user_message
     destination_for_location = _extract_destination_from_location_question(user_message)
     
-    # Agregar hint de idioma al agente
-    language_hint = "[RESPOND IN SPANISH]" if user_is_spanish else "[RESPOND IN ENGLISH]"
+    # Add language hint to the agent
+    language_hint = "[RESPOND IN SPANISH]" if user_lang_es else "[RESPOND IN ENGLISH]"
     
     mode_hint = ""
     if mode in {"voice", "audio"}:
@@ -169,7 +171,7 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
     result = _retry(lambda: selected_agent.invoke(inputs, config=config))
     messages: list = result.get("messages", [])
 
-    # ── Extraer última respuesta AI ────────────────────────────────────────────
+    # ── Extract latest AI response ────────────────────────────────────────────
     ai_messages = [m for m in messages if isinstance(m, AIMessage)]
     output_text = ai_messages[-1].content if ai_messages else "Sorry, I didn't get a response."
     if isinstance(output_text, list):  # handle multi-part content
@@ -179,7 +181,7 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
         )
 
     normalized_output = output_text.lower()
-    # user_is_spanish ya detectado al principio de run_agent
+    # user_lang_es already detected at the beginning of run_agent
     if _contains_any(user_message, IMAGE_REQUEST_TERMS) and (
         "no puedo mostrar" in normalized_output
         or "cannot show" in normalized_output
@@ -189,7 +191,7 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
         or "could not find specific images" in normalized_output
         or "no image results found" in normalized_output
     ):
-        if user_is_spanish:
+        if user_lang_es:
             output_text = (
                 "Claro, te muestro una galeria de imagenes abajo en la interfaz. "
                 "Tambien puedo ayudarte a elegir barrios, miradores, templos, museos "
@@ -209,7 +211,7 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
     ):
         summary = fetch_destination_summary(destination_for_location) if destination_for_location else ""
         if summary:
-            if user_is_spanish:
+            if user_lang_es:
                 output_text = (
                     f"{summary}\n\nAbajo te dejo el mapa de referencia y una galeria de imagenes. "
                     "Desde ahi puedes abrir Google Maps, revisar la ubicacion y calcular rutas."
@@ -223,7 +225,7 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
             output_text = (
                 "Claro, te dejo el mapa de referencia abajo en la interfaz. "
                 "Desde ahi puedes abrir Google Maps, revisar la ubicacion y calcular rutas."
-            ) if user_is_spanish else (
+            ) if user_lang_es else (
                 "Sure, I am showing the reference map below in the interface. "
                 "From there you can open Google Maps, check the location, and calculate routes."
             )
@@ -234,7 +236,7 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
                 f"{summary}\n\nAbajo te muestro el mapa y una galeria de imagenes "
                 "para que tengas una referencia visual del lugar. Tambien puedo ayudarte "
                 "con zonas recomendadas, temporada ideal, seguridad y presupuesto."
-            ) if user_is_spanish else (
+            ) if user_lang_es else (
                 f"{summary}\n\nBelow, I am showing the map and an image gallery so you have "
                 "a visual reference for the place. I can also help with recommended areas, "
                 "best season, safety, and budget."
@@ -245,7 +247,7 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
                 "que aparece abajo en la interfaz. Tambien te muestro una galeria de imagenes "
                 "para que tengas una referencia visual del lugar. Si quieres, puedo ayudarte "
                 "con mejores zonas para visitar, temporada ideal, seguridad y presupuesto."
-            ) if user_is_spanish else (
+            ) if user_lang_es else (
                 f"{destination_for_location} is a destination or place you can locate on the map "
                 "shown below in the interface. I am also showing an image gallery for visual context. "
                 "I can help with the best areas to visit, ideal season, safety, and budget."
@@ -258,12 +260,12 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
             "Claro, abajo te muestro una galeria visual del destino con imagenes encontradas. "
             "Tambien puedo ayudarte con los lugares mas fotogenicos, mejores zonas para hospedarte "
             "y una ruta para visitarlo."
-        ) if user_is_spanish else (
+        ) if user_lang_es else (
             "Sure, below I am showing a visual gallery of the destination with images I found. "
             "I can also help with the most photogenic places, best areas to stay, and a route to visit it."
         )
 
-    # ── Detect tools usadas en ESTE turno (después del último HumanMessage) ───────────
+    # ── Detect tools used in THIS turn (after the latest HumanMessage) ───────────
     last_human_idx = -1
     for i, m in enumerate(messages):
         if isinstance(m, HumanMessage):
@@ -278,7 +280,7 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
                     if name:
                         tools_used.append(name)
 
-    # ── Fallback final para destino (desde tool calls) ──────────────────
+    # ── Final fallback for destination (from tool calls) ──────────────────
     if not destination_for_location and tools_used:
         for m in messages[last_human_idx:]:
             if isinstance(m, AIMessage) and getattr(m, "tool_calls", None):

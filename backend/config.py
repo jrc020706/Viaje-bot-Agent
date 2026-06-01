@@ -1,5 +1,5 @@
 """
-Configuración y constantes de ViajeBot
+ViajeBot Configuration and Constants
 """
 
 import os
@@ -7,20 +7,20 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# API Keys y URLs
+# API Keys and URLs
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 RAG_URL = os.getenv("RAG_URL", "https://en.wikipedia.org/wiki/Tourism_in_Colombia")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# Modelos de Groq
+# Groq Models
 GROQ_FAST_MODEL = os.getenv("GROQ_FAST_MODEL", "llama-3.1-8b-instant")
 GROQ_THINKING_MODEL = os.getenv("GROQ_THINKING_MODEL", "llama-3.3-70b-versatile")
 
-# Mensajes del sistema
-TRAVEL_SCOPE_MESSAGE_ES = (
-    "Puedo ayudarte con viajes, destinos, mapas, itinerarios, hoteles, vuelos, "
-    "visas, presupuestos, seguridad, gastronomia local y lugares para visitar. "
-    "Para mantenerme enfocado, reformula tu pregunta dentro de ese contexto viajero."
+# System Messages
+TRAVEL_SCOPE_MESSAGE = (
+    "I can help you with travel, destinations, maps, itineraries, hotels, flights, "
+    "visas, budgets, safety, local gastronomy, and places to visit. "
+    "To keep me focused, please rephrase your question within this travel context."
 )
 
 SYSTEM_PROMPT = """You are ViajeBot, a warm travel assistant for Colombia and worldwide destinations.
@@ -52,7 +52,7 @@ Visual UI:
 - Do not print raw image URLs.
 """
 
-# Palabras clave de viaje
+# Travel Keywords
 TRAVEL_KEYWORDS = {
     "travel", "trip", "tourism", "tourist", "destination", "destinations", "city",
     "country", "countries", "visit", "visiting", "itinerary", "flight", "flights",
@@ -78,7 +78,7 @@ TRAVEL_KEYWORDS = {
     "europa", "sudamerica", "suramerica", "centroamerica", "norteamerica", "oceania", "medio oriente",
 }
 
-# Destinos conocidos
+# Known Destinations
 KNOWN_DESTINATIONS = {
     "colombia", "bogota", "bogotá", "medellin", "medellín", "cartagena",
     "santa marta", "tayrona", "san andres", "san andrés", "providencia",
@@ -97,7 +97,7 @@ KNOWN_DESTINATIONS = {
     "moscu", "moscú", "moscow", "rotterdam", "netherlands", "paises bajos", "países bajos", "holanda",
 }
 
-# Alias para búsqueda de imágenes
+# Aliases for Image Search
 IMAGE_SEARCH_ALIASES = {
     "bogota": "Bogotá, Colombia",
     "bogotá": "Bogotá, Colombia",
@@ -117,7 +117,7 @@ IMAGE_SEARCH_ALIASES = {
     "rotterdam": "Rotterdam, Netherlands",
 }
 
-# Términos para detección de solicitudes
+# Request Detection Terms
 IMAGE_REQUEST_TERMS = ("imagen", "imagenes", "foto", "fotos", "galeria", "gallery", "image", "images", "photo", "photos")
 MAP_REQUEST_TERMS = ("mapa", "maps", "google maps", "ubicacion", "ubicado", "donde queda", "donde esta", "location", "located", "where is")
 COLOMBIA_RAG_TERMS = (
@@ -129,5 +129,5 @@ GENERIC_SCOPE_REFUSALS = (
     "i'm here to help with travel",
     "i'm here to help you with travel",
     "if you're interested in visiting",
-    "puedo ayudarte con viajes",
+    "i can help you with travel",
 )

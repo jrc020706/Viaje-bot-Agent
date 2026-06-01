@@ -98,20 +98,20 @@ ViajeBot is configured as an **Expert Travel Advisor**. It uses the following to
 Prueba-IA-Advanced/
 ├── backend/
 │   ├── main.py         # FastAPI Endpoints (/chat, /tts, /transcribe)
-│   ├── agent.py        # Punto de entrada principal (importa módulos)
-│   ├── config.py       # Constantes y configuración
-│   ├── utils.py        # Funciones de utilidad general
-│   ├── rag.py          # Setup de RAG y FAISS
-│   ├── image_utils.py  # Funciones de búsqueda de imágenes
-│   ├── tools.py        # Tools de LangChain
-│   ├── agent_core.py   # System prompt, agentes LangGraph y routing
+│   ├── agent.py        # Main entry point (imports modules)
+│   ├── config.py       # Constants and configuration
+│   ├── utils.py        # General utility functions
+│   ├── rag.py          # RAG and FAISS setup
+│   ├── image_utils.py  # Image search functions
+│   ├── tools.py        # LangChain Tools
+│   ├── agent_core.py   # System prompt, LangGraph agents, and routing
 │   └── .env            # API keys (Protected)
 ├── frontend/
 │   ├── index.html      # Glassmorphism UI
 │   ├── styles.css      # Premium Dark Mode
 │   └── app.js          # Chat & Audio Logic
 ├── requirements.txt    # Python dependencies
-├── ARQUITECTURA_VIAJEBOT.md  # Documentación técnica detallada
+├── ARQUITECTURA_VIAJEBOT.md  # Detailed technical documentation
 └── README.md           # This guide
 ```
 

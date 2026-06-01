@@ -1,5 +1,5 @@
 """
-Funciones de búsqueda de imágenes para destinos turísticos
+Image search functions for tourist destinations
 """
 
 import re
@@ -14,8 +14,8 @@ from utils import _retry, _ddg_image_search, _clean_destination_name, _get_image
 @lru_cache(maxsize=256)
 def _cached_destination_images(query: str, max_results: int = 6) -> tuple[str, ...]:
     """
-    Busca imágenes de destinos usando DuckDuckGo Images.
-    Retorna URLs directas de thumbnails/imágenes adecuadas para galerías del frontend.
+    Search for destination images using DuckDuckGo Images.
+    Returns direct thumbnail/image URLs suitable for frontend galleries.
     """
     cleaned = _clean_destination_name(query)
     if not cleaned:
@@ -50,13 +50,13 @@ def _cached_destination_images(query: str, max_results: int = 6) -> tuple[str, .
 
 
 def search_destination_images(query: str, max_results: int = 6) -> list[str]:
-    """Busca imágenes de un destino y retorna una lista de URLs."""
+    """Search for images of a destination and return a list of URLs."""
     return list(_cached_destination_images(query, max_results))
 
 
 @lru_cache(maxsize=256)
 def _wikimedia_destination_images(query: str, max_results: int = 6) -> list[str]:
-    """Búsqueda alternativa de imágenes a través de Wikipedia/Wikimedia Commons."""
+    """Alternative image search via Wikipedia/Wikimedia Commons."""
     queries = []
     normalized = query.lower().strip()
     alias = IMAGE_SEARCH_ALIASES.get(normalized)
@@ -151,7 +151,7 @@ def _wikimedia_destination_images(query: str, max_results: int = 6) -> list[str]
 
 @lru_cache(maxsize=256)
 def fetch_destination_summary(query: str) -> str:
-    """Obtiene un resumen enciclopédico corto de un destino para respuestas de fallback."""
+    """Obtains a short encyclopedic summary of a destination for fallback responses."""
     cleaned_query = re.sub(r"\s+", " ", query).strip()
     if not cleaned_query:
         return ""
@@ -176,7 +176,7 @@ def fetch_destination_summary(query: str) -> str:
 
 
 def _is_non_travel_image_url(url: str) -> bool:
-    """Filtra URLs de imágenes que no son relevantes para turismo (banderas, mapas, escudos, etc.)."""
+    """Filters image URLs that are not relevant for tourism (flags, maps, coats of arms, etc.)."""
     lower = unquote(url).lower()
     blocked = (
         "flag_of",

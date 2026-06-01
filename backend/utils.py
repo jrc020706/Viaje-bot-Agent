@@ -1,5 +1,5 @@
 """
-Funciones de utilidad general para ViajeBot
+General utility functions for ViajeBot
 """
 
 import re
@@ -25,21 +25,21 @@ def _retry(operation, attempts: int = 2):
 
 
 def _ddg_text_search(query: str, max_results: int = 4) -> list[dict]:
-    """Búsqueda de texto usando DuckDuckGo."""
+    """Text search using DuckDuckGo."""
     from duckduckgo_search import DDGS
     with DDGS() as ddgs:
         return list(ddgs.text(query, max_results=max_results))
 
 
 def _ddg_image_search(query: str, max_results: int = 6) -> list[dict]:
-    """Búsqueda de imágenes usando DuckDuckGo."""
+    """Image search using DuckDuckGo."""
     from duckduckgo_search import DDGS
     with DDGS() as ddgs:
         return list(ddgs.images(query, max_results=max_results, safesearch="moderate"))
 
 
 def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
-    """Verifica si el texto contiene alguno de los términos dados."""
+    """Verifies if the text contains any of the given terms."""
     normalized = text.lower()
     normalized = re.sub(r"\s+", " ", normalized)
     return any(term in normalized for term in terms)
@@ -47,25 +47,25 @@ def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
 
 def _detect_language(text: str) -> str:
     """
-    Detecta si el texto está principalmente en español o inglés.
-    Retorna: 'es' para español, 'en' para inglés, o 'es' por defecto si no está seguro.
+    Detects if the text is primarily in Spanish or English.
+    Returns: 'es' for Spanish, 'en' for English, or 'es' by default if unsure.
     """
     if not text or len(text.strip()) < 3:
-        return 'es'  # Default to Spanish para texto muy corto
+        return 'es'  # Default to Spanish for very short text
     
     try:
-        # langdetect retorna una lista de objetos Language con probabilidades
+        # langdetect returns a list of Language objects with probabilities
         detections = detect_langs(text)
         if detections:
-            # Obtener el lenguaje con mayor probabilidad
+            # Get the language with the highest probability
             primary_lang = str(detections[0]).split(':')[0]  # e.g., 'en' or 'es'
-            # Verificar si es inglés, si no asumir español
+            # Check if it's English, otherwise assume Spanish
             if primary_lang == 'en':
                 return 'en'
             elif primary_lang == 'es':
                 return 'es'
     except (LangDetectException, Exception):
-        # Fallback a verificar palabras clave en español si la detección falla
+        # Fallback to checking Spanish keywords if detection fails
         normalized = text.lower()
         spanish_markers = (
             "donde", "dónde", "esta", "está", "ubicado", "ubicada", "imagenes",
@@ -79,7 +79,7 @@ def _detect_language(text: str) -> str:
 
 
 def _clean_destination_name(value: str) -> str:
-    """Limpia el nombre del destino eliminando palabras comunes."""
+    """Cleans the destination name by removing common words."""
     destination = re.sub(r"\s+", " ", value).strip(" .¿?¡!")
     destination = re.sub(
         r"^(ubicado|ubicada|ubica|queda|esta|está|en|de|del|la|el|a)\s+",
@@ -98,7 +98,7 @@ def _clean_destination_name(value: str) -> str:
 
 
 def _get_image_search_variants(query: str) -> list[str]:
-    """Genera variantes de búsqueda para imágenes."""
+    """Generates search variants for images."""
     cleaned = _clean_destination_name(query)
     if not cleaned:
         return []
@@ -116,7 +116,7 @@ def _get_image_search_variants(query: str) -> list[str]:
 
 
 def _extract_destination_from_location_question(text: str) -> str | None:
-    """Extrae el destino de una pregunta de ubicación."""
+    """Extracts the destination from a location question."""
     normalized = text.strip()
     patterns = [
         r"(?:donde\s+queda|dónde\s+queda|donde\s+esta|dónde\s+está)\s+(?:ubicado|ubicada|ubicada\s+en|ubicado\s+en)?\s*(.+?)(?:\?|$)",
@@ -134,7 +134,7 @@ def _extract_destination_from_location_question(text: str) -> str | None:
 
 
 def _is_travel_related(user_message: str) -> bool:
-    """Verifica si el mensaje está relacionado con viajes."""
+    """Verifies if the message is travel-related."""
     normalized = user_message.lower()
     normalized = re.sub(r"[^\w\sáéíóúüñ]", " ", normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()

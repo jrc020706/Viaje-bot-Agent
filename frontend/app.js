@@ -207,7 +207,7 @@ async function hydrateImageGallery(row, destination) {
   if (!images.length) {
     if (hasLocalImages) return;
     gallery.classList.add('image-gallery-empty');
-    gallery.innerHTML = `<div>No encontre imagenes especificas para ${escapeHtml(destination)}.</div>`;
+    gallery.innerHTML = `<div>I couldn't find specific images for ${escapeHtml(destination)}.</div>`;
     return;
   }
 
@@ -296,7 +296,7 @@ function setupSpeechRecognition() {
       .join('');
     inputEl.value = transcript;
     inputEl.dispatchEvent(new Event('input'));
-    setVoiceStatus('Escuchando... puedes enviar cuando termine la frase.', 'active');
+    setVoiceStatus('Listening... you can send your message when ready.', 'active');
   });
 
   speech.addEventListener('end', () => {
@@ -305,9 +305,9 @@ function setupSpeechRecognition() {
     micBtn.title = 'Dictate';
     if (lastSpeechError) return;
     if (inputEl.value.trim()) {
-      setVoiceStatus('Texto reconocido. Presiona enviar o Enter.', 'ok');
+      setVoiceStatus('Text recognized. Press send or Enter.', 'ok');
     } else if (responseMode === 'voice') {
-      setVoiceStatus('Pulsa el microfono para dictar tu pregunta de viaje.', 'muted');
+      setVoiceStatus('Press the microphone to dictate your travel question.', 'muted');
     } else {
       setVoiceStatus('');
     }
@@ -318,12 +318,12 @@ function setupSpeechRecognition() {
     isListening = false;
     micBtn.classList.remove('listening');
     const messages = {
-      'not-allowed': 'Permiso de microfono bloqueado. Activalo en el navegador y vuelve a intentar.',
-      'audio-capture': 'No encontre un microfono disponible en este dispositivo.',
-      'no-speech': 'No escuche voz. Pulsa el microfono e intenta hablar un poco mas cerca.',
-      network: 'El reconocimiento de voz necesita conexion del navegador. Intenta de nuevo.',
+      'not-allowed': 'Microphone permission blocked. Enable it in the browser and try again.',
+      'audio-capture': 'No available microphone found on this device.',
+      'no-speech': 'No voice heard. Press the microphone and try speaking closer.',
+      network: 'Voice recognition requires a browser connection. Try again.',
     };
-    setVoiceStatus(messages[event.error] || 'No pude iniciar el reconocimiento de voz en este navegador.', 'error');
+    setVoiceStatus(messages[event.error] || 'Could not start voice recognition in this browser.', 'error');
   });
 
   return speech;
@@ -333,7 +333,7 @@ async function toggleSpeechRecognition() {
   setMode('voice');
   
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    setVoiceStatus('Tu navegador no soporta grabacion de audio o estas en una conexion no segura (HTTP).', 'error');
+    setVoiceStatus('Your browser does not support audio recording or you are using an insecure connection (HTTP).', 'error');
     return;
   }
 
@@ -348,9 +348,9 @@ async function toggleSpeechRecognition() {
   } catch (error) {
     isListening = false;
     micBtn.classList.remove('listening');
-    let msg = 'No pude activar el microfono. Revisa permisos.';
-    if (error?.name === 'NotAllowedError') msg = 'Permiso de microfono denegado. Activalo en el navegador.';
-    if (error?.name === 'NotFoundError') msg = 'No se encontro ningun microfono conectado.';
+    let msg = 'Could not activate microphone. Check permissions.';
+    if (error?.name === 'NotAllowedError') msg = 'Microphone permission denied. Enable it in the browser.';
+    if (error?.name === 'NotFoundError') msg = 'No connected microphone found.';
     setVoiceStatus(msg, 'error');
   }
 }
@@ -366,7 +366,7 @@ function startRecording(stream) {
 
   mediaRecorder.onstop = async () => {
     const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-    setVoiceStatus('Procesando voz con Groq...', 'active');
+    setVoiceStatus('Processing voice with Groq...', 'active');
     await sendAudioToBackend(audioBlob);
     
     // Stop all tracks to release microphone
@@ -376,7 +376,7 @@ function startRecording(stream) {
   mediaRecorder.start();
   micBtn.classList.add('listening');
   micBtn.title = 'Stop recording';
-  setVoiceStatus('Escuchando... pulsa de nuevo para transcribir.', 'active');
+  setVoiceStatus('Listening... press again to transcribe.', 'active');
 }
 
 function stopRecording() {
@@ -404,12 +404,12 @@ async function sendAudioToBackend(blob) {
     if (data.text) {
       inputEl.value = data.text;
       inputEl.dispatchEvent(new Event('input'));
-      setVoiceStatus('Texto reconocido con Groq.', 'ok');
+      setVoiceStatus('Text recognized with Groq.', 'ok');
       // Optional: auto-send if you want
       // sendMessage();
     }
   } catch (error) {
-    setVoiceStatus('Error al transcribir audio: ' + error.message, 'error');
+    setVoiceStatus('Error transcribing audio: ' + error.message, 'error');
   }
 }
 
@@ -509,7 +509,7 @@ function appendBotMessage(text, toolUsed, toolName, audioBlob, visualContext = n
       <div class="image-gallery ${images.length ? '' : 'image-gallery-loading'}" aria-label="Travel images for ${escapeHtml(visualContext.destination)}">
         ${images.length ? images.map((src, index) => `
           <img src="${src}" alt="${escapeHtml(visualContext.destination)} travel view ${index + 1}" loading="lazy" />
-        `).join('') : '<div>Buscando imagenes del destino...</div>'}
+        `).join('') : '<div>Searching for destination images...</div>'}
       </div>
     `;
   }

@@ -1,5 +1,5 @@
 """
-Tools de LangChain para ViajeBot
+LangChain Tools for ViajeBot
 """
 
 import requests

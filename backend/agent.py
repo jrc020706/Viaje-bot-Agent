@@ -1,29 +1,29 @@
 """
 ViajeBot — Travel Agent (LangGraph ReAct + LangChain 1.x compatible)
-Este archivo es el punto de entrada principal que importa todos los módulos organizados.
+This file is the main entry point that imports all organized modules.
 
-Módulos organizados:
-- config.py: Constantes y configuración
-- utils.py: Funciones de utilidad general
-- rag.py: Setup de RAG y FAISS
-- image_utils.py: Funciones de búsqueda de imágenes
-- tools.py: Tools de LangChain
-- agent_core.py: System prompt, agentes LangGraph y routing
+Organized Modules:
+- config.py: Constants and configuration
+- utils.py: General utility functions
+- rag.py: RAG and FAISS setup
+- image_utils.py: Image search functions
+- tools.py: LangChain tools
+- agent_core.py: System prompt, LangGraph agents, and routing
 """
 
-# Importar configuración
+# Import configuration
 from config import (
     GEMINI_API_KEY,
     RAG_URL,
     GROQ_FAST_MODEL,
     GROQ_THINKING_MODEL,
-    TRAVEL_SCOPE_MESSAGE_ES,
+    TRAVEL_SCOPE_MESSAGE,
 )
 
-# Importar setup de RAG
+# Import RAG setup
 from rag import setup_rag, get_rag_retriever
 
-# Importar utilidades
+# Import utilities
 from utils import (
     _retry,
     _ddg_text_search,
@@ -36,14 +36,14 @@ from utils import (
     _is_travel_related,
 )
 
-# Importar funciones de imágenes
+# Import image functions
 from image_utils import (
     search_destination_images,
     fetch_destination_summary,
     _is_non_travel_image_url,
 )
 
-# Importar tools
+# Import tools
 from tools import (
     web_search,
     currency_converter,
@@ -51,10 +51,10 @@ from tools import (
     place_image_search,
 )
 
-# Importar core del agente
+# Import agent core
 from agent_core import run_agent
 
-# Exportar función principal para uso en main.py
+# Export main functions for use in main.py
 __all__ = [
     'setup_rag',
     'run_agent',

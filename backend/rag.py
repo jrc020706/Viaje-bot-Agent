@@ -1,5 +1,5 @@
 """
-Configuración de RAG (Retrieval Augmented Generation) con FAISS
+RAG (Retrieval Augmented Generation) configuration with FAISS
 """
 
 import requests
@@ -11,14 +11,14 @@ from bs4 import BeautifulSoup
 from config import GEMINI_API_KEY, RAG_URL
 from utils import _retry
 
-# Retriever global de RAG
+# Global RAG retriever
 _rag_retriever = None
 
 
 def setup_rag() -> None:
     """
-    Descarga contenido de RAG_URL, lo divide en chunks, crea embeddings
-    y los almacena en FAISS. Se llama una vez al iniciar el servidor.
+    Downloads content from RAG_URL, splits it into chunks, creates embeddings,
+    and stores them in FAISS. Called once upon server startup.
     """
     global _rag_retriever
     try:
@@ -37,10 +37,10 @@ def setup_rag() -> None:
         _rag_retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
         print(f"[RAG] ✅ Indexed {len(chunks)} chunks from {RAG_URL}")
     except Exception as exc:
-        print(f"[RAG] ⚠️  RAG setup failed (will skip): {exc}")
+        print(f"[RAG] ⚠️ RAG setup failed (will skip): {exc}")
         _rag_retriever = None
 
 
 def get_rag_retriever():
-    """Retorna el retriever de RAG."""
+    """Returns the RAG retriever."""
     return _rag_retriever
