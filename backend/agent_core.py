@@ -5,7 +5,7 @@ LangGraph Agent Core: System prompt, agents, and routing
 import os
 import re
 from langchain_groq import ChatGroq
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 from langgraph.prebuilt import create_react_agent
 
 try:
@@ -186,13 +186,23 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
             if output_text.strip():
                 break
 
-    # If the AI response is empty but tools were used, check if we should show tool results.
-    # This is a fallback in case the model only generates tool calls without final content.
-    if not output_text.strip():
-        for m in reversed(messages):
-            if hasattr(m, "content") and m.content and not isinstance(m, HumanMessage):
-                output_text = str(m.content)
-                break
+    # ── Extract tool results ──────────────────────────────────────────────────
+    tool_results = []
+    for m in messages:
+        if isinstance(m, ToolMessage):
+            tool_results.append(str(m.content))
+    
+    # If tools were used and the output is missing figures or too short, 
+    # append/prepend the tool results.
+    if tool_results:
+        combined_tool_text = "\n\n".join(tool_results)
+        # Check if the output text is very short or looks like a disclaimer
+        is_generic = "fluctuate" in output_text.lower() or "accurate at the time" in output_text.lower()
+        if len(output_text.strip()) < 50 or is_generic:
+            if output_text.strip():
+                output_text = f"{output_text}\n\n{combined_tool_text}"
+            else:
+                output_text = combined_tool_text
     
     if not output_text:
         output_text = "Sorry, I didn't get a response."
