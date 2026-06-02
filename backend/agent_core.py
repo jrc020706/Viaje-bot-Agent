@@ -113,30 +113,10 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict[st
     user_language = _detect_language(user_message)
     user_lang_es = (user_language == 'es')
     
-    if not _contains_any(user_message, (
-        "travel", "trip", "tourism", "tourist", "destination", "destinations", "city",
-        "country", "countries", "visit", "visiting", "itinerary", "flight", "flights",
-        "hotel", "hotels", "hostel", "airbnb", "visa", "passport", "budget", "currency",
-        "exchange", "rate", "usd", "eur", "cop", "gbp", "mxn", "brl", "weather", "route", "map", "maps", "location", "located", "beach",
-        "museum", "restaurant", "food", "safety", "transport", "airport", "train",
-        "bus", "packing", "season", "vacation", "holidays", "images", "photos",
-        "ticket", "tickets", "price", "prices", "cost", "costs", "fare", "fares", "how much",
-        "dangerous", "danger", "safe", "unsafe", "risky", "risk", "crime", "criminal", "violence", "violent", "advice", "warning",
-        "advisory", "secure", "security", "warning", "precaution", "cautious", "avoid", "threat",
-        "viaje", "viajar", "viajo", "turismo", "turista", "destino", "destinos", "ciudad",
-        "pais", "paises", "visitar", "itinerario", "vuelo", "vuelos", "hotel",
-        "hoteles", "hostal", "visa", "pasaporte", "presupuesto", "moneda", "cambio",
-        "tasa", "dolar", "dolares", "euro", "euros", "pesos", "precio", "precios",
-        "costo", "costos", "tarifa", "tarifas", "boleto", "boletos", "tiquete", "tiquetes",
-        "pasaje", "pasajes", "cuanto cuesta", "cuánto cuesta",
-        "clima", "ruta", "mapa", "mapas", "ubicacion", "ubicado", "queda", "playa",
-        "museum", "restaurante", "comida", "seguridad", "transporte", "aeropuerto",
-        "tren", "bus", "empacar", "temporada", "vacaciones", "imagenes", "fotos",
-        "lugares", "ciudades", "actividades", "hacer", "alla", "allá", "alli", "allí", "google maps", "donde esta", "donde queda", "donde se ubica", "llegar", "arrive", "how to", "como llegar", "cómo llegar", "como viajo", "cómo viajo",
-        "peligroso", "peligroso", "seguro", "peligro", "peligros", "delito", "violencia", "advertencia", "consejo", "recomendacion", "evitar", "riesgo",
-        "asia", "africa", "europe", "america", "center america", "central america", "south america", "north america", "oceania", "middle east",
-        "europa", "sudamerica", "suramerica", "centroamerica", "norteamerica", "oceania", "medio oriente",
-    )):
+    from config import TRAVEL_KEYWORDS, KNOWN_DESTINATIONS, COLOMBIA_RAG_TERMS
+    allowed_terms = TRAVEL_KEYWORDS.union(KNOWN_DESTINATIONS).union(COLOMBIA_RAG_TERMS)
+
+    if not _contains_any(user_message, allowed_terms):
         return {
             "text": TRAVEL_SCOPE_MESSAGE,
             "tool_used": False,
@@ -188,11 +168,18 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict[st
             if output_text.strip():
                 break
 
-    # ── Extract tool results ──────────────────────────────────────────────────
+    # ── Detect latest turn (after the latest HumanMessage) ───────────
+    last_human_idx = -1
+    for i, m in enumerate(messages):
+        if isinstance(m, HumanMessage):
+            last_human_idx = i
+
+    # ── Extract tool results ONLY for the latest turn ─────────────────
     tool_results = []
-    for m in messages:
-        if isinstance(m, ToolMessage):
-            tool_results.append(str(m.content))
+    if last_human_idx >= 0:
+        for m in messages[last_human_idx:]:
+            if isinstance(m, ToolMessage):
+                tool_results.append(str(m.content))
     
     # If tools were used, ensure the results are present in the output.
     if tool_results:
@@ -303,12 +290,7 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict[st
             "I can also help with the most photogenic places, best areas to stay, and a route to visit it."
         )
 
-    # ── Detect tools used in THIS turn (after the latest HumanMessage) ───────────
-    last_human_idx = -1
-    for i, m in enumerate(messages):
-        if isinstance(m, HumanMessage):
-            last_human_idx = i
-
+    # ── Detect tools used in THIS turn ───────────
     tools_used: list[str] = []
     if last_human_idx >= 0:
         for m in messages[last_human_idx:]:
