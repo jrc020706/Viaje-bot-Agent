@@ -158,11 +158,19 @@ The project uses GitHub Actions for automated testing on every push and pull req
 - **Detailed architecture:** See `ARQUITECTURA_VIAJEBOT.md` section 14 for comprehensive QA documentation
 - **QA status report:** See `REPORTE_QA.md` for current status and improvement roadmap
 
+### Observability & Structured Logging
+
+ViajeBot implements enterprise-grade structured logging at the presentation layer (FastAPI). 
+- **Correlation ID:** Every HTTP request is assigned a unique UUID to trace the request execution flow.
+- **Latency Metrics:** Automatically calculates request processing time in milliseconds.
+- **Centralized Handling:** All API exceptions and status codes (e.g. 200, 400, 500) are audited passively via a custom HTTP Middleware.
+
 ### Type Hints
 
 The codebase uses modern Python type hints for better code clarity and IDE support:
 - `backend/utils.py`: All utility functions have explicit type hints
 - `backend/agent_core.py`: Core agent functions have explicit type hints
+
 
 ---
 

@@ -9,10 +9,13 @@ Endpoints:
 
 import os
 import io
+import time
+import uuid
+import logging
 from dotenv import load_dotenv
 from langdetect import detect_langs, LangDetectException
 
-from fastapi import FastAPI, HTTPException, File, UploadFile
+from fastapi import FastAPI, HTTPException, File, UploadFile, Request
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -20,6 +23,15 @@ import groq
 from gtts import gTTS
 
 load_dotenv()
+
+# ---------------------------------------------------------------------------
+# Logging Setup
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - [%(levelname)s] - CorrelationID: %(correlation_id)s - %(message)s"
+)
+logger = logging.getLogger("ViajeBot")
 
 from agent import run_agent, search_destination_images, setup_rag
 
@@ -39,6 +51,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Structured Logging Middleware with Correlation ID and Latency Metrics."""
+    correlation_id = str(uuid.uuid4())
+    log_extra = {'correlation_id': correlation_id}
+    
+    start_time = time.time()
+    logger.info(f"Incoming Request: {request.method} {request.url.path}", extra=log_extra)
+    
+    try:
+        response = await call_next(request)
+        process_time = (time.time() - start_time) * 1000
+        logger.info(f"Response: {response.status_code} | Latency: {process_time:.2f}ms", extra=log_extra)
+        return response
+    except Exception as exc:
+        process_time = (time.time() - start_time) * 1000
+        logger.error(f"Request Failed: {str(exc)} | Latency: {process_time:.2f}ms", extra=log_extra)
+        raise
 
 
 @app.on_event("startup")
