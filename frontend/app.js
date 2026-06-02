@@ -484,7 +484,7 @@ function appendBotMessage(text, toolUsed, toolName, audioBlob, visualContext = n
       </div>
     `;
   }
-
+// GOOGLE MAPS ZONE //
   let visualHtml = '';
   if (visualContext?.map) {
     const query = encodeURIComponent(visualContext.destination);
