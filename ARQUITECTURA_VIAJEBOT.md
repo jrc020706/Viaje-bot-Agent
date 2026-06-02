@@ -648,7 +648,176 @@ Como explicarlo:
 
 > Para facilitar pruebas del frontend se dejo CORS abierto. En produccion se deberia restringir al dominio oficial.
 
-## 14. Resumen corto para sustentacion
+## 14. Aseguramiento de Calidad (QA)
 
-> ViajeBot usa FastAPI como backend, un frontend en HTML/CSS/JS y un agente LangGraph ReAct conectado a tools de busqueda web, conversion de moneda, RAG e imagenes. LangChain permite definir tools, manejar mensajes, conectar modelos y crear embeddings. El RAG toma contenido turistico de Colombia, lo divide en chunks, lo convierte en embeddings con Gemini y lo guarda en FAISS. Cuando una pregunta aplica, se recuperan los dos chunks mas relevantes y se entregan al agente. Para optimizar costos, se usa un modelo rapido 8B para tareas simples y voz, y un modelo 70B para razonamiento complejo. El frontend renderiza chat, mapas, galerias e interacciones de voz.
+### 14.1 Pruebas Automatizadas
+
+Ubicacion: `backend/test_tools.py`.
+
+Que hace:
+
+- Ejecuta tests unitarios para las herramientas principales del sistema.
+- Verifica que el conversor de moneda funcione correctamente.
+- Verifica que la busqueda web formatee los resultados adecuadamente.
+- Usa mocks para simular APIs externas, sin dependencias reales.
+- Valida manejo de errores y casos edge.
+
+Funcionalidades implementadas:
+
+1. **test_currency_converter_basic**: Verifica que el conversor devuelva el formato correcto con simbolos de moneda y tasas.
+2. **test_currency_converter_invalid_currency**: Verifica manejo de códigos de moneda inválidos.
+3. **test_currency_converter_api_failure**: Verifica manejo de fallos de API.
+4. **test_web_search_basic**: Verifica que la búsqueda web formatee resultados con título, cuerpo y fuente.
+5. **test_web_search_no_results**: Verifica manejo cuando no hay resultados.
+6. **test_web_search_error**: Verifica manejo de errores de red.
+7. **test_currency_rates_cache**: Verifica que las tasas de cambio se cacheen para evitar llamadas repetidas.
+8. **test_currency_converter_tool_signature**: Verifica que la tool tenga la firma correcta y docstring.
+9. **test_web_search_tool_signature**: Verifica que la tool tenga la firma correcta y docstring.
+
+Como funciona:
+
+```text
+pytest descubre tests en test_tools.py
+  -> cada test usa @patch para mockear APIs externas
+  -> ejecuta la funcion de tool con datos simulados
+  -> verifica que el resultado tenga el formato esperado
+  -> reporta pass/fail
+```
+
+Conexiones:
+
+- `test_tools.py` importa desde `tools.py`: `currency_converter`, `web_search`, `_currency_rates`.
+- Usa `unittest.mock` para simular `requests.get` y `_ddg_text_search`.
+- No depende de servicios externos reales (DuckDuckGo, open.er-api.com).
+
+Como explicarlo:
+
+> Los tests unitarios validan que cada herramienta funcione correctamente sin depender de servicios externos. Usamos mocks para simular las respuestas de las APIs, lo que permite ejecutar los tests rapidamente y de forma confiable en cualquier entorno.
+
+### 14.2 Integración Continua (CI)
+
+Ubicacion: `.github/workflows/ci.yml`.
+
+Que hace:
+
+- Ejecuta automaticamente los tests en cada push o pull request a GitHub.
+- Corre los tests en un entorno Ubuntu con Python 3.10.
+- Instala dependencias desde `requirements.txt`.
+- Ejecuta `pytest` en el directorio `backend`.
+- Verifica que el codigo Python sea sintacticamente valido con `py_compile`.
+
+Flujo paso a paso:
+
+```text
+Developer hace push a GitHub
+  -> GitHub Actions detecta el evento
+  -> Crea un runner Ubuntu
+  -> Checkout del codigo
+  -> Setup Python 3.10
+  -> Install dependencies (pip install -r requirements.txt)
+  -> Run tests (cd backend && python -m pytest test_tools.py -v)
+  -> Check syntax (python -m py_compile backend/*.py)
+  -> Reporta resultado (check verde ✅ o rojo ❌)
+```
+
+Conexiones:
+
+- El workflow se conecta automaticamente con el repositorio de GitHub.
+- Usa actions oficiales: `actions/checkout@v4`, `actions/setup-python@v5`.
+- Ejecuta los mismos tests que se pueden correr localmente.
+
+Costo:
+
+- $0 (GitHub Actions free tier para repositorios publicos y privados).
+
+Como explicarlo:
+
+> La integracion continua asegura que cada cambio de codigo pase por los tests automaticamente antes de ser aceptado. Esto previene regresiones y mantiene la calidad del proyecto sin costo adicional.
+
+### 14.3 Mejoras de Type Hints
+
+Ubicaciones:
+
+- `backend/utils.py`: funciones `_retry`, `_ddg_text_search`, `_ddg_image_search`, `_contains_any`, `_detect_language`, `_clean_destination_name`, `_get_image_search_variants`, `_extract_destination_from_location_question`, `_is_travel_related`.
+- `backend/agent_core.py`: funciones `_trim_to_window`, `_agent_prompt`, `_select_agent`, `run_agent`.
+
+Que hace:
+
+- Hace los tipos de datos mas explicitos.
+- Usa sintaxis moderna de Python (ej: `dict[str, str]` en lugar de `dict`).
+- Mejora la legibilidad del codigo.
+- Facilita la deteccion de errores por IDEs y linters.
+- Permite mejor autocompletado y documentacion automatica.
+
+Ejemplos de mejoras:
+
+```python
+# Antes
+def _ddg_text_search(query: str, max_results: int = 4) -> list[dict]:
+
+# Despues
+def _ddg_text_search(query: str, max_results: int = 4) -> list[dict[str, str]]:
+
+# Antes
+def _select_agent(user_message: str, mode: str = "text"):
+
+# Despues
+def _select_agent(user_message: str, mode: str = "text") -> tuple:
+
+# Antes
+def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
+
+# Despues
+def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict[str, any]:
+```
+
+Como explicarlo:
+
+> Los type hints mejorados hacen explicito que tipos de datos espera y devuelve cada funcion. Esto ayuda a prevenir errores, mejora la documentacion y permite que los IDEs ofrezcan mejor autocompletado.
+
+### 14.4 Como Ejecutar las Mejoras de QA Localmente
+
+Para correr los tests:
+
+```bash
+cd backend
+python -m pytest test_tools.py -v
+```
+
+Para entender los resultados:
+
+- `PASSED`: El test paso correctamente.
+- `FAILED`: El test fallo y muestra el error.
+- `.`: Un test paso (modo verbose muestra mas detalle).
+
+Para verificar sintaxis del codigo:
+
+```bash
+python -m py_compile backend/*.py
+```
+
+### 14.5 Conexiones del Sistema de QA
+
+```text
+Desarrollador escribe codigo
+  -> hace commit y push
+  -> GitHub Actions ejecuta CI
+     -> instala dependencias
+     -> corre pytest
+     -> verifica sintaxis
+  -> si pasa: check verde ✅
+  -> si falla: check rojo ❌ + notificacion
+  -> desarrollador corrige y repite
+```
+
+El sistema de QA esta integrado con:
+
+- **Desarrollo local**: Tests pueden correrse en la maquina del desarrollador.
+- **GitHub**: CI automatico en cada cambio.
+- **Codigo**: Type hints ayudan a prevenir errores durante desarrollo.
+- **Documentacion**: REPORTE_QA.md detalla estado y mejoras.
+
+## 15. Resumen corto para sustentacion
+
+> ViajeBot usa FastAPI como backend, un frontend en HTML/CSS/JS y un agente LangGraph ReAct conectado a tools de busqueda web, conversion de moneda, RAG e imagenes. LangChain permite definir tools, manejar mensajes, conectar modelos y crear embeddings. El RAG toma contenido turistico de Colombia, lo divide en chunks, lo convierte en embeddings con Gemini y lo guarda en FAISS. Cuando una pregunta aplica, se recuperan los dos chunks mas relevantes y se entregan al agente. Para optimizar costos, se usa un modelo rapido 8B para tareas simples y voz, y un modelo 70B para razonamiento complejo. El frontend renderiza chat, mapas, galerias e interacciones de voz. El sistema incluye pruebas automatizadas con pytest, integracion continua con GitHub Actions, y type hints mejorados para asegurar calidad sin costo adicional.
 

@@ -105,15 +105,64 @@ Prueba-IA-Advanced/
 │   ├── image_utils.py  # Image search functions
 │   ├── tools.py        # LangChain Tools
 │   ├── agent_core.py   # System prompt, LangGraph agents, and routing
+│   ├── test_tools.py   # Unit tests for tools (QA)
 │   └── .env            # API keys (Protected)
 ├── frontend/
 │   ├── index.html      # Glassmorphism UI
 │   ├── styles.css      # Premium Dark Mode
 │   └── app.js          # Chat & Audio Logic
-├── requirements.txt    # Python dependencies
+├── .github/
+│   └── workflows/
+│       └── ci.yml      # GitHub Actions CI workflow
+├── requirements.txt    # Python dependencies (includes pytest)
 ├── ARQUITECTURA_VIAJEBOT.md  # Detailed technical documentation
+├── REPORTE_QA.md       # QA status and improvements report
 └── README.md           # This guide
 ```
+
+---
+
+## 🧪 Quality Assurance (QA)
+
+The project includes automated testing and continuous integration to ensure code quality without additional costs.
+
+### Running Tests Locally
+
+To run the unit tests for the tools:
+
+```bash
+cd backend
+python -m pytest test_tools.py -v
+```
+
+This will run tests for:
+- Currency converter functionality
+- Web search formatting
+- Error handling
+- API caching
+- Tool signatures
+
+### Continuous Integration (CI)
+
+The project uses GitHub Actions for automated testing on every push and pull request. The CI workflow:
+
+- Runs on Ubuntu with Python 3.10
+- Installs dependencies from `requirements.txt`
+- Executes all unit tests
+- Verifies Python syntax
+
+**Cost:** $0 (GitHub Actions free tier)
+
+### QA Documentation
+
+- **Detailed architecture:** See `ARQUITECTURA_VIAJEBOT.md` section 14 for comprehensive QA documentation
+- **QA status report:** See `REPORTE_QA.md` for current status and improvement roadmap
+
+### Type Hints
+
+The codebase uses modern Python type hints for better code clarity and IDE support:
+- `backend/utils.py`: All utility functions have explicit type hints
+- `backend/agent_core.py`: Core agent functions have explicit type hints
 
 ---
 

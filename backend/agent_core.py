@@ -67,7 +67,7 @@ _thinking_agent = create_react_agent(
 # ---------------------------------------------------------------------------
 # Agent Router
 # ---------------------------------------------------------------------------
-def _select_agent(user_message: str, mode: str = "text"):
+def _select_agent(user_message: str, mode: str = "text") -> tuple:
     """
     Routes simple/voice turns to the fast model and complex text turns
     to the stronger reasoning model. Tool functions and FAISS are shared.
@@ -104,7 +104,7 @@ def _select_agent(user_message: str, mode: str = "text"):
 # ---------------------------------------------------------------------------
 # Main Agent Execution Function
 # ---------------------------------------------------------------------------
-def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict:
+def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict[str, any]:
     """
     Executes the agent for a given session.
     Returns: { text, tool_used, tool_name, tools_used, destination, model_used }

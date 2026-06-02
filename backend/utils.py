@@ -13,7 +13,7 @@ from config import (
 )
 
 
-def _retry(operation, attempts: int = 2):
+def _retry(operation: callable, attempts: int = 2) -> any:
     """Run a small retry loop for flaky network/model calls."""
     last_error = None
     for _ in range(attempts):
@@ -24,14 +24,14 @@ def _retry(operation, attempts: int = 2):
     raise last_error
 
 
-def _ddg_text_search(query: str, max_results: int = 4) -> list[dict]:
+def _ddg_text_search(query: str, max_results: int = 4) -> list[dict[str, str]]:
     """Text search using DuckDuckGo."""
     from duckduckgo_search import DDGS
     with DDGS() as ddgs:
         return list(ddgs.text(query, max_results=max_results))
 
 
-def _ddg_image_search(query: str, max_results: int = 6) -> list[dict]:
+def _ddg_image_search(query: str, max_results: int = 6) -> list[dict[str, str]]:
     """Image search using DuckDuckGo."""
     from duckduckgo_search import DDGS
     with DDGS() as ddgs:
