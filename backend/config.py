@@ -13,7 +13,7 @@ RAG_URL = os.getenv("RAG_URL", "https://en.wikipedia.org/wiki/Tourism_in_Colombi
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # Groq Models
-GROQ_FAST_MODEL = os.getenv("GROQ_FAST_MODEL", "llama-3.1-8b-instant")
+GROQ_FAST_MODEL = os.getenv("GROQ_FAST_MODEL", "llama-3.3-70b-versatile")
 GROQ_THINKING_MODEL = os.getenv("GROQ_THINKING_MODEL", "llama-3.3-70b-versatile")
 
 # System Messages
@@ -50,6 +50,7 @@ Memory:
 Visual UI:
 - The frontend renders maps and image galleries. Mention that the map/gallery appears below.
 - Do not print raw image URLs.
+- IMPORTANT: When replying to the user, NEVER return raw JSON, XML, or <function> tags. You must output final responses in pure markdown / natural text.
 """
 
 # Travel Keywords
