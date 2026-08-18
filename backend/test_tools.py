@@ -8,6 +8,11 @@ from unittest.mock import Mock, patch
 from tools import currency_converter, web_search, _currency_rates
 
 
+def setup_function():
+    """Keep cached exchange-rate responses isolated between tests."""
+    _currency_rates.cache_clear()
+
+
 # ---------------------------------------------------------------------------
 # Test 1: Currency Converter - Basic functionality
 # ---------------------------------------------------------------------------
@@ -21,7 +26,7 @@ def test_currency_converter_basic():
     }
     
     with patch('tools.requests.get', return_value=mock_response):
-        result = currency_converter(100, "USD", "EUR")
+        result = currency_converter.invoke({"amount": 100, "from_currency": "USD", "to_currency": "EUR"})
         
         # Verify the result contains expected format
         assert "100.00" in result
@@ -39,7 +44,7 @@ def test_currency_converter_invalid_currency():
     }
     
     with patch('tools.requests.get', return_value=mock_response):
-        result = currency_converter(100, "USD", "XXX")
+        result = currency_converter.invoke({"amount": 100, "from_currency": "USD", "to_currency": "XXX"})
         
         # Should return error message for invalid currency
         assert "not recognized" in result.lower() or "error" in result.lower()
@@ -51,7 +56,7 @@ def test_currency_converter_api_failure():
     mock_response.json.return_value = {"result": "failure"}
     
     with patch('tools.requests.get', return_value=mock_response):
-        result = currency_converter(100, "USD", "EUR")
+        result = currency_converter.invoke({"amount": 100, "from_currency": "USD", "to_currency": "EUR"})
         
         # Should return error message
         assert "error" in result.lower() or "could not" in result.lower()
@@ -76,18 +81,19 @@ def test_web_search_basic():
     ]
     
     with patch('tools._ddg_text_search', return_value=mock_results):
-        result = web_search("test query")
+        result = web_search.invoke({"query": "test query"})
         
         # Verify results are formatted correctly
         assert "Test Result 1" in result
         assert "This is a test search result." in result
-        assert "https://example.com/1" in result
+        assert "Source: example.com" in result
+        assert "https://example.com/1" not in result
 
 
 def test_web_search_no_results():
     """Test web search handles no results gracefully."""
     with patch('tools._ddg_text_search', return_value=[]):
-        result = web_search("test query")
+        result = web_search.invoke({"query": "test query"})
         
         # Should return appropriate message
         assert "no search results" in result.lower()
@@ -96,7 +102,7 @@ def test_web_search_no_results():
 def test_web_search_error():
     """Test web search handles errors gracefully."""
     with patch('tools._ddg_text_search', side_effect=Exception("Network error")):
-        result = web_search("test query")
+        result = web_search.invoke({"query": "test query"})
         
         # Should return error message
         assert "error" in result.lower()
@@ -107,6 +113,7 @@ def test_web_search_error():
 # ---------------------------------------------------------------------------
 def test_currency_rates_cache():
     """Test that currency rates are cached to avoid repeated API calls."""
+    _currency_rates.cache_clear()
     mock_response = Mock()
     mock_response.json.return_value = {
         "result": "success",
@@ -128,8 +135,8 @@ def test_currency_rates_cache():
 # ---------------------------------------------------------------------------
 def test_currency_converter_tool_signature():
     """Test that currency converter tool has correct signature."""
-    # Verify the tool can be called with expected parameters
-    assert callable(currency_converter)
+    # LangChain tools expose their public execution interface through invoke.
+    assert callable(currency_converter.invoke)
     
     # Check that it has the expected docstring
     assert "Convert monetary amounts" in currency_converter.description
@@ -137,8 +144,8 @@ def test_currency_converter_tool_signature():
 
 def test_web_search_tool_signature():
     """Test that web search tool has correct signature."""
-    # Verify the tool can be called with expected parameters
-    assert callable(web_search)
+    # LangChain tools expose their public execution interface through invoke.
+    assert callable(web_search.invoke)
     
     # Check that it has the expected docstring
     assert "Search the web" in web_search.description

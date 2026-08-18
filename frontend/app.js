@@ -26,6 +26,11 @@ const welcomeCard = document.getElementById('welcome-card');
 const statusDot   = document.getElementById('status-dot');
 const voiceStatus = document.getElementById('voice-status');
 const themeToggle = document.getElementById('theme-toggle');
+const tripStarterForm = document.getElementById('trip-starter');
+const tripDestination = document.getElementById('trip-destination');
+const tripStartDate = document.getElementById('trip-start-date');
+const tripEndDate = document.getElementById('trip-end-date');
+const tripBudget = document.getElementById('trip-budget');
 
 const DESTINATION_IMAGES = {
   tokio: ['https://images.unsplash.com/photo-1542051841857-5f90071e7989?auto=format&fit=crop&w=700&q=80', 'https://images.unsplash.com/photo-1536098561742-ca998e48cbcc?auto=format&fit=crop&w=700&q=80', 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=700&q=80'],
@@ -256,6 +261,29 @@ document.querySelectorAll('.chip').forEach(chip => {
     sendMessage();
   });
 });
+
+if (tripStarterForm) {
+  tripStarterForm.addEventListener('submit', event => {
+    event.preventDefault();
+    const destination = tripDestination.value.trim();
+    if (!destination) {
+      tripDestination.focus();
+      return;
+    }
+
+    const dates = tripStartDate.value && tripEndDate.value
+      ? ` from ${tripStartDate.value} to ${tripEndDate.value}`
+      : tripStartDate.value
+        ? ` starting on ${tripStartDate.value}`
+        : tripEndDate.value
+          ? ` ending on ${tripEndDate.value}`
+          : '';
+    const budget = tripBudget.value ? ` with a ${tripBudget.value} budget` : '';
+
+    inputEl.value = `Create a travel plan for ${destination}${dates}${budget}. Include an itinerary, transportation, estimated costs, and safety tips.`;
+    sendMessage();
+  });
+}
 
 // ── Input Auto-resize ──────────────────────────────────────────────────────
 inputEl.addEventListener('input', () => {

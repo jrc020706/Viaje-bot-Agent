@@ -4,6 +4,8 @@ LangGraph Agent Core: System prompt, agents, and routing
 
 import os
 import re
+from threading import RLock
+from typing import Any, NamedTuple
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 from langgraph.prebuilt import create_react_agent
@@ -37,6 +39,125 @@ _thinking_llm = ChatGroq(model=GROQ_THINKING_MODEL, groq_api_key=GROQ_API_KEY, t
 _memory = MemorySaver()
 
 
+# This is deliberately small, session-scoped memory. It complements LangGraph's
+# message history with preferences that remain useful after old turns are trimmed.
+_travel_profiles: dict[str, dict[str, str]] = {}
+_pending_profile_updates: dict[str, dict[str, str]] = {}
+_profile_lock = RLock()
+_MAX_PROFILE_SESSIONS = 1_000
+
+
+class AgentSelection(NamedTuple):
+    """The model and request category selected for a user turn."""
+
+    agent: Any
+    model: str
+    intent: str
+
+
+def _extract_travel_preferences(message: str) -> dict[str, str]:
+    """Extracts only general trip preferences; no personal identifiers are stored."""
+    normalized = re.sub(r"\s+", " ", message.strip())
+    preferences: dict[str, str] = {}
+
+    duration = re.search(r"\b(\d{1,2}\s*(?:d[ií]as?|semanas?|days?|weeks?))\b", normalized, re.IGNORECASE)
+    if duration:
+        preferences["duracion"] = duration.group(1)
+
+    budget = re.search(
+        r"\b(?:presupuesto(?:\s+(?:de|es|ser[ií]a))?|budget(?:\s+(?:of|is|will be))?)\s*[:=]?\s*"
+        r"((?:\$|usd|eur|cop|mxn)?\s*[\d.,]+(?:\s*(?:usd|eur|cop|mxn|pesos?|d[oó]lares?|euros?))?)",
+        normalized,
+        re.IGNORECASE,
+    )
+    if budget and re.search(r"\d", budget.group(1)):
+        preferences["presupuesto"] = budget.group(1).strip()
+
+    style = re.search(
+        r"\b(?:viaje|trip|estilo)\s+(?:de\s+)?"
+        r"(econ[oó]mico|barato|lujo|relajado|aventura|familiar|rom[aá]ntico|mochilero|"
+        r"budget|cheap|luxury|relaxed|adventure|family|romantic|backpacking)\b",
+        normalized,
+        re.IGNORECASE,
+    )
+    if style:
+        preferences["estilo"] = style.group(1).lower()
+
+    companions = re.search(
+        r"\b(?:viajo|viajamos|voy|vamos|travel(?:ing)?|going)\s+(?:con|with)\s+"
+        r"(mi\s+(?:pareja|familia|amigo(?:s)?|hijo(?:s)?)|"
+        r"my\s+(?:partner|family|friend(?:s)?|child(?:ren)?))\b",
+        normalized,
+        re.IGNORECASE,
+    )
+    if companions:
+        preferences["acompanantes"] = companions.group(1).lower()
+
+    return preferences
+
+
+def _is_confirmation(message: str) -> bool:
+    """Accept short affirmative replies only when a preference change is pending."""
+    normalized = re.sub(r"[^\w\sáéíóúüñ]", "", message.lower()).strip()
+    return normalized in {"si", "sí", "confirmo", "confirmar", "yes", "confirm", "correcto", "correct"}
+
+
+def _update_travel_profile(session_id: str, message: str) -> tuple[dict[str, str], dict[str, str], bool]:
+    """Updates a new preference or returns changes that still need confirmation."""
+    candidate = _extract_travel_preferences(message)
+    with _profile_lock:
+        confirmed_pending_update = _is_confirmation(message) and session_id in _pending_profile_updates
+        if confirmed_pending_update:
+            _travel_profiles.setdefault(session_id, {}).update(_pending_profile_updates.pop(session_id))
+        elif candidate:
+            profile = _travel_profiles.setdefault(session_id, {})
+            replacements = {
+                field: value for field, value in candidate.items()
+                if field in profile and profile[field] != value
+            }
+            if replacements:
+                # New fields are safe to keep; only conflicting values need consent.
+                profile.update({field: value for field, value in candidate.items() if field not in replacements})
+                _pending_profile_updates.setdefault(session_id, {}).update(replacements)
+            else:
+                profile.update(candidate)
+
+        # Bound memory growth on long-running deployments.
+        if len(_travel_profiles) > _MAX_PROFILE_SESSIONS:
+            oldest_session = next(iter(_travel_profiles))
+            _travel_profiles.pop(oldest_session, None)
+            _pending_profile_updates.pop(oldest_session, None)
+
+        return (
+            dict(_travel_profiles.get(session_id, {})),
+            dict(_pending_profile_updates.get(session_id, {})),
+            confirmed_pending_update,
+        )
+
+
+def _format_profile_context(profile: dict[str, str], pending_updates: dict[str, str], language: str) -> str:
+    """Creates a compact profile hint for the model without exposing internal data."""
+    if not profile and not pending_updates:
+        return ""
+
+    labels = {
+        "presupuesto": "presupuesto" if language == "es" else "budget",
+        "estilo": "estilo" if language == "es" else "style",
+        "acompanantes": "acompanantes" if language == "es" else "companions",
+        "duracion": "duracion" if language == "es" else "duration",
+    }
+    profile_text = ", ".join(f"{labels[key]}: {value}" for key, value in profile.items())
+    if pending_updates:
+        pending_text = ", ".join(f"{labels[key]}: {value}" for key, value in pending_updates.items())
+        confirmation = (
+            f"Detectaste un posible cambio ({pending_text}). Pide una confirmacion breve antes de usarlo."
+            if language == "es"
+            else f"You detected a possible change ({pending_text}). Ask for brief confirmation before using it."
+        )
+        return f"[TRAVEL PROFILE: {profile_text}. {confirmation}]"
+    return f"[TRAVEL PROFILE: {profile_text}]"
+
+
 def _trim_to_window(messages: list, window: int = 8) -> list:
     """Keeps only the last `window` non-system messages for model context."""
     other_msgs = [m for m in messages if not isinstance(m, SystemMessage)]
@@ -67,44 +188,57 @@ _thinking_agent = create_react_agent(
 # ---------------------------------------------------------------------------
 # Agent Router
 # ---------------------------------------------------------------------------
-def _select_agent(user_message: str, mode: str = "text") -> tuple:
+def _select_agent(user_message: str, mode: str = "text") -> AgentSelection:
     """
-    Routes simple/voice turns to the fast model and complex text turns
-    to the stronger reasoning model. Tool functions and FAISS are shared.
+    Routes a turn according to its intent. Complex travel decisions take
+    precedence over visual requests so a full plan with photos is not rushed.
     """
     normalized = user_message.lower()
     normalized = re.sub(r"\s+", " ", normalized)
 
     if mode in {"voice", "audio"}:
-        return _agent, GROQ_FAST_MODEL
+        return AgentSelection(_agent, GROQ_FAST_MODEL, "voice")
 
-    fast_only_terms = (
+    visual_terms = (
         "imagen", "imagenes", "imágenes", "foto", "fotos", "mapa", "maps",
         "google maps", "donde queda", "dónde queda", "donde esta", "dónde está",
-        "convierte", "convertir", "currency", "cambio", "tasa",
-        "image", "images", "photo", "photos", "map", "convert", "rate",
+        "galeria", "galería", "gallery", "image", "images", "photo", "photos",
+        "where is", "location of",
     )
-    if _contains_any(normalized, fast_only_terms):
-        return _agent, GROQ_FAST_MODEL
-
-    thinking_terms = (
+    conversion_terms = (
+        "convierte", "convertir", "currency", "cambio", "tasa",
+        "convert", "rate", "exchange", "conversion",
+    )
+    planning_terms = (
         "itinerario", "plan", "ruta", "presupuesto", "budget", "seguridad",
         "safety", "riesgo", "visa", "comparar", "compare", "recomienda",
         "recommend", "familia", "family", "dias", "días", "weeks", "semanas",
         "barato", "lujo", "hotel", "hoteles",
         "itinerary", "route", "risk", "cheap", "luxury", "hotels",
     )
-    is_long = len(normalized.split()) >= 18
-    if is_long or _contains_any(normalized, thinking_terms):
-        return _thinking_agent, GROQ_THINKING_MODEL
+    time_sensitive_terms = (
+        "hoy", "actual", "actualizado", "latest", "current", "now", "ahora",
+        "alerta", "advisory", "requisitos", "requirements", "horario", "schedule",
+    )
 
-    return _agent, GROQ_FAST_MODEL
+    planning_matches = sum(term in normalized for term in planning_terms)
+    is_complex = len(normalized.split()) >= 18 or planning_matches >= 1
+    if is_complex:
+        return AgentSelection(_thinking_agent, GROQ_THINKING_MODEL, "planning")
+    if _contains_any(normalized, time_sensitive_terms):
+        return AgentSelection(_thinking_agent, GROQ_THINKING_MODEL, "current_info")
+    if _contains_any(normalized, conversion_terms):
+        return AgentSelection(_agent, GROQ_FAST_MODEL, "currency")
+    if _contains_any(normalized, visual_terms):
+        return AgentSelection(_agent, GROQ_FAST_MODEL, "visual")
+
+    return AgentSelection(_agent, GROQ_FAST_MODEL, "quick_question")
 
 
 # ---------------------------------------------------------------------------
 # Main Agent Execution Function
 # ---------------------------------------------------------------------------
-def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict[str, any]:
+def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict[str, Any]:
     """
     Executes the agent for a given session.
     Returns: { text, tool_used, tool_name, tools_used, destination, model_used }
@@ -112,11 +246,12 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict[st
     # Detect user language early
     user_language = _detect_language(user_message)
     user_lang_es = (user_language == 'es')
+    profile, pending_profile_updates, is_profile_confirmation = _update_travel_profile(session_id, user_message)
     
     from config import TRAVEL_KEYWORDS, KNOWN_DESTINATIONS, COLOMBIA_RAG_TERMS
     allowed_terms = TRAVEL_KEYWORDS.union(KNOWN_DESTINATIONS).union(COLOMBIA_RAG_TERMS)
 
-    if not _contains_any(user_message, allowed_terms):
+    if not _contains_any(user_message, allowed_terms) and not is_profile_confirmation:
         return {
             "text": TRAVEL_SCOPE_MESSAGE,
             "tool_used": False,
@@ -124,6 +259,25 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict[st
             "tool_name": None,
             "destination": None,
             "model_used": GROQ_FAST_MODEL,
+            "intent": "out_of_scope",
+        }
+
+    if is_profile_confirmation:
+        confirmation_text = (
+            "Listo, actualice tus preferencias de viaje para esta sesion. "
+            "Ahora puedo usar ese contexto en las siguientes recomendaciones."
+            if user_lang_es
+            else "Done, I updated your travel preferences for this session. "
+            "I can use that context in the recommendations that follow."
+        )
+        return {
+            "text": confirmation_text,
+            "tool_used": False,
+            "tools_used": [],
+            "tool_name": None,
+            "destination": None,
+            "model_used": None,
+            "intent": "preference_update",
         }
 
     config = {"configurable": {"thread_id": session_id}}
@@ -142,15 +296,16 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict[st
     if mode in {"voice", "audio"}:
         mode_hint = " [MODO VOZ: responde en 2-4 frases cortas.]" if user_lang_es else " [VOICE MODE: answer in 2-4 short sentences.]"
 
+    profile_context = _format_profile_context(profile, pending_profile_updates, user_language)
     if destination_for_location:
-        agent_message = f"{language_hint}{mode_hint} {location_instruction}: {user_message}"
+        agent_message = f"{language_hint}{mode_hint} {profile_context} {location_instruction}: {user_message}"
     else:
-        agent_message = f"{language_hint}{mode_hint} {user_message}"
+        agent_message = f"{language_hint}{mode_hint} {profile_context} {user_message}"
 
     inputs = {"messages": [HumanMessage(content=agent_message)]}
 
-    selected_agent, model_used = _select_agent(user_message, mode=mode)
-    result = _retry(lambda: selected_agent.invoke(inputs, config=config))
+    selection = _select_agent(user_message, mode=mode)
+    result = _retry(lambda: selection.agent.invoke(inputs, config=config))
     messages: list = result.get("messages", [])
 
     # ── Extract latest AI response ────────────────────────────────────────────
@@ -185,16 +340,14 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict[st
     if tool_results:
         combined_tool_text = "\n\n".join(tool_results)
         
-        # Heuristic: If it's a currency or image request, we WANT the raw tool data visible
-        # unless it's already clearly present in the AI response.
+        # Exchange results contain exact figures, so include them when the model omits
+        # the calculation. Other tool output stays internal to avoid leaking raw URLs.
         conversion_terms = ("convertir", "cambio", "tasa", "convert", "rate", "currency", "dolar", "peso", "usd", "cop")
         is_conversion = _contains_any(user_message.lower(), conversion_terms)
         
-        # If the output text is short, or it doesn't seem to contain the figures from the tool,
-        # or it's a special request type, append the tool results.
         content_missing = not any(char.isdigit() for char in output_text) if is_conversion else False
-        
-        if len(output_text.strip()) < 120 or is_conversion or content_missing:
+
+        if is_conversion and (len(output_text.strip()) < 120 or content_missing):
             # Avoid obvious duplicates
             if combined_tool_text[:30] not in output_text:
                 if output_text.strip():
@@ -317,5 +470,6 @@ def run_agent(session_id: str, user_message: str, mode: str = "text") -> dict[st
         "tools_used": tools_used,
         "tool_name": tools_used[0] if tools_used else None,
         "destination": destination_for_location,
-        "model_used": model_used,
+        "model_used": selection.model,
+        "intent": selection.intent,
     }

@@ -529,6 +529,76 @@ body.light-theme .mode-toggle { background: rgba(0,0,0,0.05); }
   margin-bottom: 16px;
 }
 
+.trip-starter {
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(79, 156, 249, 0.1), rgba(0, 212, 170, 0.05));
+  text-align: left;
+}
+
+.trip-starter-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.trip-starter-heading strong { color: var(--text-primary); font-size: 0.78rem; }
+.trip-starter-heading span { color: var(--text-muted); font-size: 0.68rem; text-align: right; }
+
+.trip-starter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.trip-field { display: grid; gap: 4px; }
+.trip-field-destination { grid-column: span 2; }
+.trip-field span { color: var(--text-secondary); font-size: 0.67rem; font-weight: 600; }
+
+.trip-field input,
+.trip-field select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 7px 8px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.73rem;
+  outline: none;
+}
+
+.trip-field input:focus,
+.trip-field select:focus {
+  border-color: var(--clr-primary);
+  box-shadow: 0 0 0 2px rgba(79, 156, 249, 0.12);
+}
+
+.trip-starter-submit {
+  width: 100%;
+  margin-top: 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  background: var(--grad-btn);
+  color: #fff;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+
+.trip-starter-submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(79, 156, 249, 0.28);
+}
+
 .quick-chips {
   display: flex;
   flex-wrap: wrap;

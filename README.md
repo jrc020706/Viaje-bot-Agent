@@ -59,7 +59,7 @@ Now visit: **[http://localhost:3000](http://localhost:3000)**
 
 The system has been modernized to use high-performance, low-latency providers:
 
-- **LLM**: [Groq](https://groq.com/) using `llama-3.1-8b-instant` for fast travel advice.
+- **LLM**: [Groq](https://groq.com/) using `openai/gpt-oss-20b` for quick requests and `openai/gpt-oss-120b` for planning, comparison, safety, visa, and current-information questions. Both can be changed with `GROQ_FAST_MODEL` and `GROQ_THINKING_MODEL`.
 - **Embeddings (RAG)**: [Google Gemini](https://ai.google.dev/) (`models/gemini-embedding-001`).
 - **Voice Response (TTS)**: `gTTS` (Google Text-to-Speech) — free, reliable, and natural in Spanish.
 - **Voice Transcription (STT)**: [Groq Whisper](https://groq.com/) (`whisper-large-v3`) for audio-to-text.

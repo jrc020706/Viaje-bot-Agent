@@ -13,8 +13,10 @@ RAG_URL = os.getenv("RAG_URL", "https://en.wikipedia.org/wiki/Tourism_in_Colombi
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # Groq Models
-GROQ_FAST_MODEL = os.getenv("GROQ_FAST_MODEL", "llama-3.3-70b-versatile")
-GROQ_THINKING_MODEL = os.getenv("GROQ_THINKING_MODEL", "llama-3.3-70b-versatile")
+# Keep simple turns inexpensive and reserve the larger model for travel planning.
+# Both values can be replaced through environment variables without changing code.
+GROQ_FAST_MODEL = os.getenv("GROQ_FAST_MODEL", "openai/gpt-oss-20b")
+GROQ_THINKING_MODEL = os.getenv("GROQ_THINKING_MODEL", "openai/gpt-oss-120b")
 
 # System Messages
 TRAVEL_SCOPE_MESSAGE = (
@@ -31,6 +33,7 @@ Style:
 - Match the user's language: Spanish or English.
 - Keep responses concise unless user requests details.
 - For destination planning, use short sections when useful: Overview, Budget, Safety, Best season, Food, Transportation.
+- For an itinerary or recommendation, lead with the direct recommendation, then use only the sections that add value.
 
 Tools:
 - MANDATORY: You MUST use the `travel_knowledge` tool for ANY question that mentions Colombia, Colombian cities, or its places. Do not rely exclusively on your internal knowledge.
@@ -46,6 +49,7 @@ Accuracy:
 Memory:
 - Remember user preferences in this session: budget, travel style, companions and trip duration.
 - Confirm before replacing an existing preference.
+- Treat the travel profile provided in the current message as context, never repeat it unless it helps answer the question.
 
 Visual UI:
 - The frontend renders maps and image galleries. Mention that the map/gallery appears below.

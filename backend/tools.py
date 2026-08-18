@@ -4,6 +4,7 @@ LangChain Tools for ViajeBot
 
 import requests
 from functools import lru_cache
+from urllib.parse import urlparse
 from langchain_core.tools import tool
 
 from config import COLOMBIA_RAG_TERMS
@@ -31,7 +32,8 @@ def web_search(query: str) -> str:
             return "No search results found."
         lines = []
         for r in results:
-            lines.append(f"**{r['title']}**\n{r['body']}\nSource: {r['href']}")
+            source = urlparse(r.get("href", "")).netloc.removeprefix("www.") or "unknown source"
+            lines.append(f"**{r['title']}**\n{r['body']}\nSource: {source}")
         return "\n\n".join(lines)
     except Exception as exc:
         return f"Search error: {exc}"

@@ -274,6 +274,36 @@
           <strong>Colombia</strong> or anywhere in the world — flights, hotels,
           visas, currency, and more.
         </p>
+        <form class="trip-starter" id="trip-starter">
+          <div class="trip-starter-heading">
+            <strong>Build a quick trip plan</strong>
+            <span>Start with the essentials and I'll refine it with you.</span>
+          </div>
+          <div class="trip-starter-grid">
+            <label class="trip-field trip-field-destination">
+              <span>Destination</span>
+              <input id="trip-destination" type="text" placeholder="Cartagena" required maxlength="80" />
+            </label>
+            <label class="trip-field">
+              <span>Start date</span>
+              <input id="trip-start-date" type="date" />
+            </label>
+            <label class="trip-field">
+              <span>End date</span>
+              <input id="trip-end-date" type="date" />
+            </label>
+            <label class="trip-field">
+              <span>Budget</span>
+              <select id="trip-budget">
+                <option value="">Flexible</option>
+                <option value="budget">Budget</option>
+                <option value="mid-range">Mid-range</option>
+                <option value="premium">Premium</option>
+              </select>
+            </label>
+          </div>
+          <button class="trip-starter-submit" type="submit">Plan my trip</button>
+        </form>
         <div class="quick-chips">
           <button class="chip" id="chip-1">🏖️ Best beaches in Colombia</button>
           <button class="chip" id="chip-2">💱 USD to COP rate</button>
