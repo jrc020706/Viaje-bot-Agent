@@ -13,7 +13,7 @@ import time
 import uuid
 import logging
 from pathlib import Path
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from langdetect import detect_langs, LangDetectException
 
 from fastapi import FastAPI, HTTPException, File, UploadFile, Request
@@ -23,8 +23,7 @@ from pydantic import BaseModel
 import groq
 from gtts import gTTS
 
-env_path = Path(__file__).resolve().parent.parent / '.env'
-load_dotenv(dotenv_path=env_path, override=True)
+load_dotenv(find_dotenv(), override=True)
 
 # ---------------------------------------------------------------------------
 # Logging Setup

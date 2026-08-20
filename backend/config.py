@@ -3,11 +3,9 @@ ViajeBot Configuration and Constants
 """
 
 import os
-from pathlib import Path
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-env_path = Path(__file__).resolve().parent.parent / '.env'
-load_dotenv(dotenv_path=env_path, override=True)
+load_dotenv(find_dotenv(), override=True)
 
 # API Keys and URLs
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
