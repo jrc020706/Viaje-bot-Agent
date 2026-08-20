@@ -12,6 +12,7 @@ import io
 import time
 import uuid
 import logging
+from pathlib import Path
 from dotenv import load_dotenv
 from langdetect import detect_langs, LangDetectException
 
@@ -22,15 +23,25 @@ from pydantic import BaseModel
 import groq
 from gtts import gTTS
 
-load_dotenv()
+env_path = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(dotenv_path=env_path, override=True)
 
 # ---------------------------------------------------------------------------
 # Logging Setup
 # ---------------------------------------------------------------------------
+class CorrelationIdFilter(logging.Filter):
+    def filter(self, record):
+        if not hasattr(record, 'correlation_id'):
+            record.correlation_id = 'N/A'
+        return True
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - [%(levelname)s] - CorrelationID: %(correlation_id)s - %(message)s"
 )
+for handler in logging.root.handlers:
+    handler.addFilter(CorrelationIdFilter())
+    
 logger = logging.getLogger("ViajeBot")
 
 from agent import run_agent, search_destination_images, setup_rag
